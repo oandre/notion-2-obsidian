@@ -2,6 +2,7 @@ import enum
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 _FORBIDDEN = re.compile(r'[\\/:*?"<>|]')
 
@@ -19,6 +20,8 @@ class PlannedNode:
     title: str
     parent_id: str | None
     children_ids: list[str] = field(default_factory=list)
+    blocks: list[dict[str, Any]] = field(default_factory=list)
+    page_data: dict[str, Any] = field(default_factory=dict)
 
 
 def slugify(name: str) -> str:

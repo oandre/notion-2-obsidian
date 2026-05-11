@@ -54,6 +54,7 @@ async def discover_subtree(
         root = PlannedNode(
             id=root_id, kind=NodeKind.PAGE,
             title=_page_title(page), parent_id=None,
+            page_data=page,
         )
         await _walk_page(client, root, collected)
     else:
@@ -62,6 +63,7 @@ async def discover_subtree(
             id=root_id, kind=NodeKind.DATABASE,
             title=rich_text_to_md(db.get("title", [])) or "Untitled",
             parent_id=None,
+            page_data=db,
         )
         await _walk_database(client, root, collected)
 
@@ -71,8 +73,8 @@ async def discover_subtree(
 async def _walk_page(
     client: AsyncNotionClient, node: PlannedNode, out: list[PlannedNode]
 ) -> None:
-    blocks = await fetch_block_children(client, node.id)
-    for block in blocks:
+    node.blocks = await fetch_block_children(client, node.id)
+    for block in node.blocks:
         btype = block.get("type")
         if btype == "child_page":
             child = PlannedNode(
@@ -103,6 +105,7 @@ async def _walk_database(
         item_node = PlannedNode(
             id=item["id"], kind=NodeKind.DB_ITEM,
             title=title, parent_id=node.id,
+            page_data=item,
         )
         node.children_ids.append(item_node.id)
         out.append(item_node)
