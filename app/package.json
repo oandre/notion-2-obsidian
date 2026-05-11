@@ -22,11 +22,13 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev:server": "tsx watch bin/cli.ts",
+    "dev": "concurrently -n server,web -c blue,green --kill-others-on-fail \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "NO_OPEN=1 tsx watch bin/cli.ts",
     "dev:web": "vite",
     "build:web": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "build": "npm run build:web && npm run build:server",
+    "start": "node dist/bin/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check src bin",
@@ -51,6 +53,7 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.2.1",
     "happy-dom": "^15.7.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
