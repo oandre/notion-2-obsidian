@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlparse
 
 from notion_extractor.convert.inline import rich_text_to_md
 
@@ -192,6 +193,41 @@ def _table(block: dict, _ctx: RenderContext) -> str:
     return "".join(out)
 
 
+def _media_url_and_external(payload: dict) -> tuple[str, bool]:
+    kind = payload.get("type", "file")
+    inner = payload.get(kind, {})
+    url = inner.get("url", "")
+    is_external = kind == "external"
+    return url, is_external
+
+
+def _asset_target(url: str, is_external: bool) -> str:
+    return url if is_external else f"{{{{notion-asset:{url}}}}}"
+
+
+def _basename(url: str) -> str:
+    path = urlparse(url).path
+    return path.rsplit("/", 1)[-1] or "file"
+
+
+def _image(block: dict, _ctx: RenderContext) -> str:
+    payload = block["image"]
+    url, is_external = _media_url_and_external(payload)
+    caption = rich_text_to_md(payload.get("caption") or [])
+    target = _asset_target(url, is_external)
+    return f"![{caption}]({target})\n"
+
+
+def _file_like(field: str) -> BlockHandler:
+    def handler(block: dict, _ctx: RenderContext) -> str:
+        payload = block[field]
+        url, is_external = _media_url_and_external(payload)
+        caption = rich_text_to_md(payload.get("caption") or []) or _basename(url)
+        target = _asset_target(url, is_external)
+        return f"[{caption}]({target})\n"
+    return handler
+
+
 _HANDLERS: dict[str, BlockHandler] = {
     "paragraph": _paragraph,
     "heading_1": _heading(1),
@@ -206,4 +242,9 @@ _HANDLERS: dict[str, BlockHandler] = {
     "toggle": _toggle,
     "equation": _equation_block,
     "table": _table,
+    "image": _image,
+    "pdf": _file_like("pdf"),
+    "file": _file_like("file"),
+    "video": _file_like("video"),
+    "audio": _file_like("audio"),
 }
