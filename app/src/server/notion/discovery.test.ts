@@ -1,7 +1,7 @@
 import { type Dispatcher, MockAgent, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NotionClient } from './client.js';
-import { discoverSubtree, listSharedRoots } from './discovery.js';
+import { discoverSubtree, discoverWorkspace, listSharedRoots } from './discovery.js';
 
 let mock: MockAgent;
 let previous: Dispatcher;
@@ -129,5 +129,47 @@ describe('discoverSubtree', () => {
     // Caches blocks on the node so the pipeline doesn't refetch
     expect(p1?.blocks).toBeDefined();
     expect(p1?.blocks.length).toBeGreaterThan(0);
+  });
+});
+
+describe('discoverWorkspace', () => {
+  it('walks every root returned by /search', async () => {
+    const pool = mock.get('https://api.notion.com');
+
+    pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
+      results: [
+        {
+          object: 'page',
+          id: 'p1',
+          properties: { title: { type: 'title', title: [rich('Notas')] } },
+        },
+        { object: 'database', id: 'd1', title: [rich('Tarefas')] },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    pool.intercept({ path: '/v1/pages/p1', method: 'GET' }).reply(200, {
+      id: 'p1',
+      properties: { title: { type: 'title', title: [rich('Notas')] } },
+    });
+    pool
+      .intercept({ path: '/v1/blocks/p1/children?page_size=100', method: 'GET' })
+      .reply(200, { results: [], next_cursor: null, has_more: false });
+
+    pool.intercept({ path: '/v1/databases/d1', method: 'GET' }).reply(200, {
+      id: 'd1',
+      title: [rich('Tarefas')],
+    });
+    pool.intercept({ path: '/v1/databases/d1/query', method: 'POST' }).reply(200, {
+      results: [],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    const client = new NotionClient({ token: 't' });
+    const nodes = await discoverWorkspace(client);
+
+    expect(new Set(nodes.map((n) => n.id))).toEqual(new Set(['p1', 'd1']));
   });
 });

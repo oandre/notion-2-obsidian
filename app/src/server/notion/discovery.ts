@@ -52,6 +52,16 @@ export async function discoverSubtree(
   return [root, ...collected];
 }
 
+export async function discoverWorkspace(client: NotionClient): Promise<PlannedNode[]> {
+  const roots = await listSharedRoots(client);
+  const trees: PlannedNode[][] = [];
+  for (const root of roots) {
+    const subtree = await discoverSubtree(client, root.id, root.kind);
+    trees.push(subtree);
+  }
+  return trees.flat();
+}
+
 async function walkPage(
   client: NotionClient,
   node: PlannedNode,
