@@ -45,7 +45,11 @@ npm start</code></pre>
       <li><strong>"Nenhuma página/database compartilhada"</strong> — step 2 wasn't done. Share at least one top-level page with the integration inside Notion.</li>
       <li><strong>401/403 in the log</strong> — token is wrong or revoked. Re-issue it on the integration's Configuration page and clear the <code>.env</code> next to where you ran the tool.</li>
       <li><strong>A link shows up as plain text or <code>(link removed)</code></strong> — that page wasn't in your selection. <code>_report.md</code> lists every such case; re-run with the missing pages selected.</li>
+      <li><strong>Workspace tree feels out of date</strong> — the picker caches the workspace structure to <code>&lt;output&gt;/.notion-2-obsidian-cache.json</code> so reopens are instant. Hit the <strong>↻ Refresh</strong> button in the picker header to re-walk the workspace.</li>
     </ul>
+
+    <h2>Workspace tree cache</h2>
+    <p>The first time you open the picker, the tool walks every page and database your integration can see — for big workspaces this can take a minute. The result is cached at <code>&lt;output&gt;/.notion-2-obsidian-cache.json</code> so subsequent opens are instant. Hit the <strong>↻ Refresh</strong> button in the picker header to re-walk the workspace whenever you've added or moved pages in Notion.</p>
 
     <h2>Known limitations</h2>
     <ul>

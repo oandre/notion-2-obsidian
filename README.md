@@ -73,7 +73,8 @@ Full conversion details: https://oandre.github.io/notion-2-obsidian/docs/
 - **The UI shows "Nenhuma página/database compartilhada"** — you forgot step 2. Share at least one top-level page with the integration inside Notion.
 - **401/403 in the log** — token is invalid or expired. Generate a new one from the integration's page and start fresh (delete `.env` and re-configure in the UI).
 - **A link in the vault is "(link removed)" or plain text** — the linked page wasn't part of your selection. Check `_report.md` for the list and re-run with the missing pages selected.
-- **Want to start over** — delete the output directory and re-run. Each run overwrites everything.
+- **Want to start over** — delete the output directory and re-run. Each run overwrites everything (except the `.notion-2-obsidian-cache.json` cache file at the root — see below).
+- **Workspace tree feels out of date** — the picker caches the workspace structure in `<output>/.notion-2-obsidian-cache.json` so reopens are instant. Click the **↻ Refresh** button in the picker header to re-walk the workspace. The cache also invalidates automatically if the token suddenly points to a different workspace.
 
 ## Development
 
