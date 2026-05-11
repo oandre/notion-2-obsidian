@@ -1,0 +1,31 @@
+---
+import Default from '../layouts/Default.astro';
+---
+<Default title="Privacy Policy — notion-2-obsidian" description="Privacy policy">
+  <article class="prose prose-neutral max-w-none">
+    <h1>Privacy Policy</h1>
+    <p><em>Last updated: 2026-05-11</em></p>
+
+    <h2>What we collect</h2>
+    <p><strong>Nothing.</strong> <code>notion-2-obsidian</code> is a local tool that runs on your machine. There is no server, no telemetry, no analytics. We do not collect, store, transmit, or share any user data.</p>
+
+    <h2>What the tool accesses</h2>
+    <ul>
+      <li><strong>Notion API.</strong> The tool calls Notion's official API using the integration token you provide. Calls go directly from your machine to <code>api.notion.com</code>.</li>
+      <li><strong>Notion-hosted files.</strong> Images and attachments referenced in your pages are downloaded from Notion's S3 URLs directly to your local disk.</li>
+      <li><strong>Your local filesystem.</strong> The output vault is written to a path you choose.</li>
+    </ul>
+
+    <h2>Your Notion data</h2>
+    <p>The integration token only has access to pages and databases you explicitly share with it inside Notion. You can revoke the token at any time from your Notion integrations page.</p>
+
+    <h2>Third parties</h2>
+    <p>The tool does not call any service besides Notion's API and the file URLs Notion itself emits. There are no third-party trackers, no ads, no SDKs.</p>
+
+    <h2>Open source</h2>
+    <p>The source code is public at <a href="https://github.com/oandre/notion-2-obsidian">github.com/oandre/notion-2-obsidian</a>. You can audit exactly what the tool does.</p>
+
+    <h2>Contact</h2>
+    <p>Questions or concerns: <a href="https://github.com/oandre/notion-2-obsidian/issues">file a GitHub issue</a>.</p>
+  </article>
+</Default>

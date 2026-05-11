@@ -1,0 +1,25 @@
+---
+import Default from '../layouts/Default.astro';
+---
+<Default title="notion-2-obsidian" description="Migre seu workspace do Notion para um vault Obsidian. Roda local, open source.">
+  <section class="space-y-4">
+    <h1 class="text-4xl font-semibold tracking-tight">Migre Notion → Obsidian. Local. Sem nuvem.</h1>
+    <p class="text-lg text-neutral-700">Selecione as páginas que você quer, baixe um vault Obsidian completo: wikilinks, frontmatter, anexos.</p>
+    <pre class="bg-neutral-900 text-neutral-100 rounded-md p-4 text-sm overflow-x-auto"><code>npx notion-2-obsidian@latest</code></pre>
+  </section>
+
+  <section class="grid gap-6 md:grid-cols-3 mt-12">
+    <div>
+      <h2 class="font-semibold mb-1">Você escolhe</h2>
+      <p class="text-sm text-neutral-700">Árvore com as páginas e databases que você compartilhou com a integração. Marque o que quiser.</p>
+    </div>
+    <div>
+      <h2 class="font-semibold mb-1">Markdown limpo</h2>
+      <p class="text-sm text-neutral-700">Callouts, toggles, code com linguagem, tabelas, equações, embeds nativos do Obsidian.</p>
+    </div>
+    <div>
+      <h2 class="font-semibold mb-1">Roda local</h2>
+      <p class="text-sm text-neutral-700">Não há servidor. Não enviamos nada. Sua máquina conversa com a API do Notion e escreve em disco.</p>
+    </div>
+  </section>
+</Default>

@@ -1,0 +1,38 @@
+---
+import Default from '../../layouts/Default.astro';
+---
+<Default title="Docs — notion-2-obsidian" description="How to set up and use">
+  <article class="prose prose-neutral max-w-none">
+    <h1>Quickstart</h1>
+
+    <h2>1. Create a Notion integration</h2>
+    <ol>
+      <li>Go to <a href="https://www.notion.so/profile/integrations">notion.so/profile/integrations</a>.</li>
+      <li>Click <strong>+ New integration</strong>. Pick <strong>Internal</strong>. Name it whatever, pick your workspace.</li>
+      <li>Copy the <strong>Internal Integration Token</strong>.</li>
+    </ol>
+
+    <h2>2. Share pages with the integration</h2>
+    <p>In Notion, open the page you want to migrate → click <code>···</code> → <strong>Connections</strong> → pick your integration. Sub-pages and database rows are reachable automatically.</p>
+
+    <h2>3. Run the tool</h2>
+    <pre><code>npx notion-2-obsidian@latest</code></pre>
+    <p>Your browser opens. Paste the token, pick an output folder, and select what to migrate.</p>
+
+    <h2>What you get</h2>
+    <ul>
+      <li><strong>Pages</strong> → <code>.md</code> files (or folders if they have sub-pages, with a sibling <code>.md</code> for the page content).</li>
+      <li><strong>Databases</strong> → folders with one <code>.md</code> per row. Properties go into YAML frontmatter. The folder gets a sibling <code>.md</code> with a table linking each row.</li>
+      <li><strong>Mentions, relations, link_to_page</strong> → Obsidian wikilinks (<code>[[Page Name]]</code>) if the target was also extracted. Otherwise listed in <code>_report.md</code>.</li>
+      <li><strong>Attachments</strong> → downloaded to <code>assets/</code>, links rewritten to relative paths.</li>
+    </ul>
+
+    <h2>Known limitations</h2>
+    <ul>
+      <li>Column layouts are flattened (content kept, layout lost).</li>
+      <li>Synced blocks render inline; Obsidian has no direct transclusion equivalent.</li>
+      <li>Comments and version history are not exported (Notion's API doesn't expose them).</li>
+      <li>Each run overwrites the output directory. No incremental sync.</li>
+    </ul>
+  </article>
+</Default>

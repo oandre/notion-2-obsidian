@@ -1,0 +1,62 @@
+{
+  "name": "notion-2-obsidian",
+  "version": "0.2.0-alpha.0",
+  "description": "Migrate a Notion workspace to an Obsidian vault. Runs locally.",
+  "type": "module",
+  "license": "MIT",
+  "author": "André Simões",
+  "homepage": "https://github.com/oandre/notion-2-obsidian",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oandre/notion-2-obsidian.git"
+  },
+  "bin": {
+    "notion-2-obsidian": "dist/bin/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:server": "tsx watch bin/cli.ts",
+    "dev:web": "vite",
+    "build:web": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build": "npm run build:web && npm run build:server",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check src bin",
+    "format": "biome format --write src bin",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/static": "^7.0.4",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "open": "^10.1.0",
+    "p-limit": "^5.0.0",
+    "undici": "^6.19.8",
+    "yaml": "^2.5.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.0.1",
+    "@types/node": "^20.16.5",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "happy-dom": "^15.7.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.6",
+    "vitest": "^2.1.1"
+  }
+}
