@@ -82,3 +82,57 @@ pre.log {
 .log-line.done {
   color: #88f0a0;
 }
+.tree-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.tree-header .meta {
+  font-size: 0.85rem;
+  color: #777;
+}
+.tree-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.tree-toolbar button {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.6rem;
+  background: #eee;
+  color: #333;
+}
+.tree-node {
+  padding: 0.15rem 0;
+}
+.tree-node .row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: default;
+}
+.tree-node .chev {
+  width: 1rem;
+  display: inline-block;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  color: #888;
+}
+.tree-node .chev.placeholder {
+  cursor: default;
+  color: transparent;
+}
+.tree-node .children {
+  margin-left: 1.25rem;
+  border-left: 1px solid #eee;
+  padding-left: 0.5rem;
+}
+.discovery-progress {
+  padding: 1rem;
+}
+.discovery-progress p {
+  color: #555;
+  margin: 0.5rem 0;
+}
