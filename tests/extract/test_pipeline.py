@@ -9,22 +9,26 @@ from notion_extractor.progress import EventBus
 
 
 def _rich(text: str) -> list[dict]:
-    return [{
-        "type": "text",
-        "text": {"content": text, "link": None},
-        "plain_text": text,
-        "href": None,
-        "annotations": {
-            "bold": False, "italic": False, "strikethrough": False,
-            "underline": False, "code": False, "color": "default",
-        },
-    }]
+    return [
+        {
+            "type": "text",
+            "text": {"content": text, "link": None},
+            "plain_text": text,
+            "href": None,
+            "annotations": {
+                "bold": False,
+                "italic": False,
+                "strikethrough": False,
+                "underline": False,
+                "code": False,
+                "color": "default",
+            },
+        }
+    ]
 
 
 @pytest.mark.asyncio
-async def test_extract_simple_page_writes_md(
-    tmp_path: Path, httpx_mock: HTTPXMock
-) -> None:
+async def test_extract_simple_page_writes_md(tmp_path: Path, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
         url="https://api.notion.com/v1/pages/p1",
         json={

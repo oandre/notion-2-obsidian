@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
-class EventKind(str, enum.Enum):
+class EventKind(enum.StrEnum):
     DISCOVERY_STARTED = "discovery_started"
     DISCOVERY_PROGRESS = "discovery_progress"
     DISCOVERY_DONE = "discovery_done"

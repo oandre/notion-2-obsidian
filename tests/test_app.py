@@ -16,17 +16,22 @@ def test_get_roots(httpx_mock: HTTPXMock) -> None:
                     "properties": {
                         "title": {
                             "type": "title",
-                            "title": [{
-                                "plain_text": "Top",
-                                "type": "text",
-                                "text": {"content": "Top", "link": None},
-                                "href": None,
-                                "annotations": {
-                                    "bold": False, "italic": False,
-                                    "strikethrough": False, "underline": False,
-                                    "code": False, "color": "default",
-                                },
-                            }],
+                            "title": [
+                                {
+                                    "plain_text": "Top",
+                                    "type": "text",
+                                    "text": {"content": "Top", "link": None},
+                                    "href": None,
+                                    "annotations": {
+                                        "bold": False,
+                                        "italic": False,
+                                        "strikethrough": False,
+                                        "underline": False,
+                                        "code": False,
+                                        "color": "default",
+                                    },
+                                }
+                            ],
                         }
                     },
                 }

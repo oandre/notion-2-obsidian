@@ -7,7 +7,7 @@ from typing import Any
 _FORBIDDEN = re.compile(r'[\\/:*?"<>|]')
 
 
-class NodeKind(str, enum.Enum):
+class NodeKind(enum.StrEnum):
     PAGE = "page"
     DATABASE = "database"
     DB_ITEM = "db_item"

@@ -71,8 +71,12 @@ def test_mention_page_emits_placeholder() -> None:
         "plain_text": "Some Page",
         "href": "https://www.notion.so/abc123",
         "annotations": {
-            "bold": False, "italic": False, "strikethrough": False,
-            "underline": False, "code": False, "color": "default",
+            "bold": False,
+            "italic": False,
+            "strikethrough": False,
+            "underline": False,
+            "code": False,
+            "color": "default",
         },
     }
     assert rich_text_to_md([mention]) == "{{notion-link:abc-123|Some Page}}"
@@ -85,8 +89,12 @@ def test_mention_date() -> None:
         "plain_text": "2026-05-11",
         "href": None,
         "annotations": {
-            "bold": False, "italic": False, "strikethrough": False,
-            "underline": False, "code": False, "color": "default",
+            "bold": False,
+            "italic": False,
+            "strikethrough": False,
+            "underline": False,
+            "code": False,
+            "color": "default",
         },
     }
     assert rich_text_to_md([mention]) == "2026-05-11"
@@ -99,8 +107,12 @@ def test_inline_equation() -> None:
         "plain_text": "x^2",
         "href": None,
         "annotations": {
-            "bold": False, "italic": False, "strikethrough": False,
-            "underline": False, "code": False, "color": "default",
+            "bold": False,
+            "italic": False,
+            "strikethrough": False,
+            "underline": False,
+            "code": False,
+            "color": "default",
         },
     }
     assert rich_text_to_md([seg]) == "$x^2$"

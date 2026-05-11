@@ -1,8 +1,10 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import Any, Self
+from typing import Any, Self, TypeVar
 
 import httpx
+
+T = TypeVar("T")
 
 NOTION_API_BASE = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
@@ -38,7 +40,7 @@ class AsyncNotionClient:
     async def __aexit__(self, *_exc: object) -> None:
         await self._http.aclose()
 
-    async def _with_limit[T](self, call: Callable[[], Awaitable[T]]) -> T:
+    async def _with_limit(self, call: Callable[[], Awaitable[T]]) -> T:
         async with self._sem:
             return await call()
 
@@ -47,15 +49,10 @@ class AsyncNotionClient:
     ) -> dict[str, Any]:
         attempt = 0
         while True:
-            response = await self._with_limit(
-                lambda: self._http.request(method, path, json=json)
-            )
+            response = await self._with_limit(lambda: self._http.request(method, path, json=json))
             if response.status_code < 400:
                 return response.json()
-            if (
-                response.status_code in (429, 500, 502, 503, 504)
-                and attempt < self._max_retries
-            ):
+            if response.status_code in (429, 500, 502, 503, 504) and attempt < self._max_retries:
                 retry_after = float(response.headers.get("Retry-After", "0") or 0)
                 wait = max(retry_after, self._backoff_base * (2**attempt))
                 await asyncio.sleep(wait)

@@ -2,16 +2,22 @@ from notion_extractor.convert.blocks import blocks_to_md
 
 
 def _cell(text: str) -> list[dict]:
-    return [{
-        "type": "text",
-        "text": {"content": text, "link": None},
-        "plain_text": text,
-        "href": None,
-        "annotations": {
-            "bold": False, "italic": False, "strikethrough": False,
-            "underline": False, "code": False, "color": "default",
-        },
-    }]
+    return [
+        {
+            "type": "text",
+            "text": {"content": text, "link": None},
+            "plain_text": text,
+            "href": None,
+            "annotations": {
+                "bold": False,
+                "italic": False,
+                "strikethrough": False,
+                "underline": False,
+                "code": False,
+                "color": "default",
+            },
+        }
+    ]
 
 
 def _row(cells: list[list[dict]]) -> dict:
@@ -35,12 +41,7 @@ def test_table_with_header() -> None:
         "has_children": True,
         "children": rows,
     }
-    expected = (
-        "| Name | Age |\n"
-        "| --- | --- |\n"
-        "| Ana | 30 |\n"
-        "| Bia | 25 |\n"
-    )
+    expected = "| Name | Age |\n| --- | --- |\n| Ana | 30 |\n| Bia | 25 |\n"
     assert blocks_to_md([table]) == expected
 
 
@@ -55,10 +56,5 @@ def test_table_no_header_synthesizes_blank_header() -> None:
         "has_children": True,
         "children": rows,
     }
-    expected = (
-        "|  |  |\n"
-        "| --- | --- |\n"
-        "| a | b |\n"
-        "| c | d |\n"
-    )
+    expected = "|  |  |\n| --- | --- |\n| a | b |\n| c | d |\n"
     assert blocks_to_md([table]) == expected

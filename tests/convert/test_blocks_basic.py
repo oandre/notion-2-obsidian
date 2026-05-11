@@ -2,16 +2,22 @@ from notion_extractor.convert.blocks import blocks_to_md
 
 
 def _text_rich(content: str) -> list[dict]:
-    return [{
-        "type": "text",
-        "text": {"content": content, "link": None},
-        "plain_text": content,
-        "href": None,
-        "annotations": {
-            "bold": False, "italic": False, "strikethrough": False,
-            "underline": False, "code": False, "color": "default",
-        },
-    }]
+    return [
+        {
+            "type": "text",
+            "text": {"content": content, "link": None},
+            "plain_text": content,
+            "href": None,
+            "annotations": {
+                "bold": False,
+                "italic": False,
+                "strikethrough": False,
+                "underline": False,
+                "code": False,
+                "color": "default",
+            },
+        }
+    ]
 
 
 def _block(block_type: str, payload: dict, children: list[dict] | None = None) -> dict:

@@ -2,21 +2,25 @@ from notion_extractor.convert.blocks import blocks_to_md
 
 
 def _text_rich(content: str) -> list[dict]:
-    return [{
-        "type": "text",
-        "text": {"content": content, "link": None},
-        "plain_text": content,
-        "href": None,
-        "annotations": {
-            "bold": False, "italic": False, "strikethrough": False,
-            "underline": False, "code": False, "color": "default",
-        },
-    }]
+    return [
+        {
+            "type": "text",
+            "text": {"content": content, "link": None},
+            "plain_text": content,
+            "href": None,
+            "annotations": {
+                "bold": False,
+                "italic": False,
+                "strikethrough": False,
+                "underline": False,
+                "code": False,
+                "color": "default",
+            },
+        }
+    ]
 
 
-def _file_block(
-    block_type: str, url: str, *, caption: str = "", file_kind: str = "file"
-) -> dict:
+def _file_block(block_type: str, url: str, *, caption: str = "", file_kind: str = "file") -> dict:
     if file_kind == "file":
         payload = {
             "type": "file",
@@ -38,9 +42,7 @@ def _file_block(
 
 
 def test_image_internal_emits_asset_placeholder() -> None:
-    block = _file_block(
-        "image", "https://prod-files.s3.amazonaws.com/x.png", caption="screenshot"
-    )
+    block = _file_block("image", "https://prod-files.s3.amazonaws.com/x.png", caption="screenshot")
     assert blocks_to_md([block]) == (
         "![screenshot]({{notion-asset:https://prod-files.s3.amazonaws.com/x.png}})\n"
     )
@@ -52,27 +54,21 @@ def test_image_external_kept_as_external() -> None:
 
 
 def test_pdf_block() -> None:
-    block = _file_block(
-        "pdf", "https://prod-files.s3.amazonaws.com/doc.pdf", caption="paper"
-    )
+    block = _file_block("pdf", "https://prod-files.s3.amazonaws.com/doc.pdf", caption="paper")
     assert blocks_to_md([block]) == (
         "[paper]({{notion-asset:https://prod-files.s3.amazonaws.com/doc.pdf}})\n"
     )
 
 
 def test_file_block_no_caption_uses_basename() -> None:
-    block = _file_block(
-        "file", "https://prod-files.s3.amazonaws.com/folder/report.docx"
-    )
+    block = _file_block("file", "https://prod-files.s3.amazonaws.com/folder/report.docx")
     assert blocks_to_md([block]) == (
         "[report.docx]({{notion-asset:https://prod-files.s3.amazonaws.com/folder/report.docx}})\n"
     )
 
 
 def test_video_internal() -> None:
-    block = _file_block(
-        "video", "https://prod-files.s3.amazonaws.com/v.mp4", caption="clip"
-    )
+    block = _file_block("video", "https://prod-files.s3.amazonaws.com/v.mp4", caption="clip")
     assert blocks_to_md([block]) == (
         "[clip]({{notion-asset:https://prod-files.s3.amazonaws.com/v.mp4}})\n"
     )

@@ -13,8 +13,12 @@ def _rich(text: str) -> dict:
         "text": {"content": text, "link": None},
         "href": None,
         "annotations": {
-            "bold": False, "italic": False, "strikethrough": False,
-            "underline": False, "code": False, "color": "default",
+            "bold": False,
+            "italic": False,
+            "strikethrough": False,
+            "underline": False,
+            "code": False,
+            "color": "default",
         },
     }
 
@@ -62,9 +66,7 @@ async def test_discover_subtree_walks_children(httpx_mock: HTTPXMock) -> None:
         url="https://api.notion.com/v1/pages/p1",
         json={
             "id": "p1",
-            "properties": {
-                "title": {"type": "title", "title": [_rich("Root")]}
-            },
+            "properties": {"title": {"type": "title", "title": [_rich("Root")]}},
         },
     )
     httpx_mock.add_response(

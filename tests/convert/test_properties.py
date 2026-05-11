@@ -4,16 +4,22 @@ from notion_extractor.convert.properties import properties_to_frontmatter
 def _title(text: str) -> dict:
     return {
         "type": "title",
-        "title": [{
-            "type": "text",
-            "plain_text": text,
-            "text": {"content": text, "link": None},
-            "href": None,
-            "annotations": {
-                "bold": False, "italic": False, "strikethrough": False,
-                "underline": False, "code": False, "color": "default",
-            },
-        }],
+        "title": [
+            {
+                "type": "text",
+                "plain_text": text,
+                "text": {"content": text, "link": None},
+                "href": None,
+                "annotations": {
+                    "bold": False,
+                    "italic": False,
+                    "strikethrough": False,
+                    "underline": False,
+                    "code": False,
+                    "color": "default",
+                },
+            }
+        ],
     }
 
 
@@ -27,16 +33,22 @@ def test_rich_text() -> None:
     props = {
         "Notes": {
             "type": "rich_text",
-            "rich_text": [{
-                "type": "text",
-                "plain_text": "some note",
-                "text": {"content": "some note", "link": None},
-                "href": None,
-                "annotations": {
-                    "bold": False, "italic": False, "strikethrough": False,
-                    "underline": False, "code": False, "color": "default",
-                },
-            }],
+            "rich_text": [
+                {
+                    "type": "text",
+                    "plain_text": "some note",
+                    "text": {"content": "some note", "link": None},
+                    "href": None,
+                    "annotations": {
+                        "bold": False,
+                        "italic": False,
+                        "strikethrough": False,
+                        "underline": False,
+                        "code": False,
+                        "color": "default",
+                    },
+                }
+            ],
         }
     }
     assert properties_to_frontmatter(props) == {"Notes": "some note"}
@@ -156,9 +168,7 @@ def test_files_emits_placeholders() -> None:
 
 
 def test_relation_emits_link_placeholders() -> None:
-    props = {
-        "Rel": {"type": "relation", "relation": [{"id": "abc"}, {"id": "def"}]}
-    }
+    props = {"Rel": {"type": "relation", "relation": [{"id": "abc"}, {"id": "def"}]}}
     assert properties_to_frontmatter(props) == {
         "Rel": ["{{notion-link:abc}}", "{{notion-link:def}}"]
     }
@@ -181,6 +191,4 @@ def test_created_time() -> None:
             "created_time": "2026-01-01T00:00:00.000Z",
         }
     }
-    assert properties_to_frontmatter(props) == {
-        "Created": "2026-01-01T00:00:00.000Z"
-    }
+    assert properties_to_frontmatter(props) == {"Created": "2026-01-01T00:00:00.000Z"}

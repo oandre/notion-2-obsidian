@@ -8,7 +8,7 @@ def test_slugify_keeps_unicode() -> None:
 
 
 def test_slugify_replaces_forbidden_chars() -> None:
-    assert slugify("a/b\\c:d*e?f\"g<h>i|j") == "a-b-c-d-e-f-g-h-i-j"
+    assert slugify('a/b\\c:d*e?f"g<h>i|j') == "a-b-c-d-e-f-g-h-i-j"
 
 
 def test_slugify_strips_outer_whitespace() -> None:
@@ -42,8 +42,20 @@ def test_page_with_children_is_folder_plus_sibling_file() -> None:
 def test_database_always_folder_with_sibling_index() -> None:
     root = Path("/v")
     nodes = [
-        PlannedNode(id="db", kind=NodeKind.DATABASE, title="Tarefas", parent_id=None, children_ids=["i1"]),
-        PlannedNode(id="i1", kind=NodeKind.DB_ITEM, title="Fazer X", parent_id="db", children_ids=[]),
+        PlannedNode(
+            id="db",
+            kind=NodeKind.DATABASE,
+            title="Tarefas",
+            parent_id=None,
+            children_ids=["i1"],
+        ),
+        PlannedNode(
+            id="i1",
+            kind=NodeKind.DB_ITEM,
+            title="Fazer X",
+            parent_id="db",
+            children_ids=[],
+        ),
     ]
     paths = plan_paths(nodes, root)
     assert paths["db"] == root / "Tarefas.md"

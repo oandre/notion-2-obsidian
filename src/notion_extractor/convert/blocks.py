@@ -86,6 +86,7 @@ def _heading(level: int) -> BlockHandler:
         key = f"heading_{level}"
         text = rich_text_to_md(block[key]["rich_text"])
         return f"{'#' * level} {text}\n" + _render_children(block, ctx)
+
     return handler
 
 
@@ -225,15 +226,21 @@ def _file_like(field: str) -> BlockHandler:
         caption = rich_text_to_md(payload.get("caption") or []) or _basename(url)
         target = _asset_target(url, is_external)
         return f"[{caption}]({target})\n"
+
     return handler
 
 
 _OBSIDIAN_EMBED_HOSTS = {
-    "www.youtube.com", "youtube.com", "youtu.be",
-    "twitter.com", "x.com",
+    "www.youtube.com",
+    "youtube.com",
+    "youtu.be",
+    "twitter.com",
+    "x.com",
     "vimeo.com",
-    "loom.com", "www.loom.com",
-    "figma.com", "www.figma.com",
+    "loom.com",
+    "www.loom.com",
+    "figma.com",
+    "www.figma.com",
 }
 
 
@@ -257,6 +264,7 @@ def _embed_block(field: str) -> BlockHandler:
             return f"![{caption}]({url})\n"
         display = caption or _display_url(url)
         return f"[{display}]({url})\n"
+
     return handler
 
 

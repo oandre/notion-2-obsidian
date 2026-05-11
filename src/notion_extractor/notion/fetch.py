@@ -4,9 +4,7 @@ from typing import Any
 from notion_extractor.notion.client import AsyncNotionClient
 
 
-async def fetch_block_children(
-    client: AsyncNotionClient, block_id: str
-) -> list[dict[str, Any]]:
+async def fetch_block_children(client: AsyncNotionClient, block_id: str) -> list[dict[str, Any]]:
     blocks = await _paginate_get(client, f"/blocks/{block_id}/children")
 
     async def hydrate(block: dict[str, Any]) -> dict[str, Any]:
@@ -21,9 +19,7 @@ async def fetch_block_children(
     return list(await asyncio.gather(*(hydrate(b) for b in blocks)))
 
 
-async def query_database(
-    client: AsyncNotionClient, database_id: str
-) -> list[dict[str, Any]]:
+async def query_database(client: AsyncNotionClient, database_id: str) -> list[dict[str, Any]]:
     return await _paginate_post(client, f"/databases/{database_id}/query", body={})
 
 
@@ -35,9 +31,7 @@ async def get_database(client: AsyncNotionClient, database_id: str) -> dict[str,
     return await client.get(f"/databases/{database_id}")
 
 
-async def _paginate_get(
-    client: AsyncNotionClient, path: str
-) -> list[dict[str, Any]]:
+async def _paginate_get(client: AsyncNotionClient, path: str) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     cursor: str | None = None
     while True:

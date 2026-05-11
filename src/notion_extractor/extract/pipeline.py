@@ -55,10 +55,12 @@ async def run_extraction(
             kind = NodeKind(root_kind_str)
             subtree = await discover_subtree(client, root_id=root_id, root_kind=kind)
             all_nodes.extend(subtree)
-            await bus.publish(Event(
-                EventKind.DISCOVERY_PROGRESS,
-                {"root_id": root_id, "discovered": len(subtree)},
-            ))
+            await bus.publish(
+                Event(
+                    EventKind.DISCOVERY_PROGRESS,
+                    {"root_id": root_id, "discovered": len(subtree)},
+                )
+            )
         await bus.publish(Event(EventKind.DISCOVERY_DONE, {"total": len(all_nodes)}))
 
         paths = plan_paths(all_nodes, output_dir)
@@ -66,10 +68,12 @@ async def run_extraction(
         rendered: dict[str, str] = {}
 
         for node in all_nodes:
-            await bus.publish(Event(
-                EventKind.NODE_STARTED,
-                {"id": node.id, "title": node.title},
-            ))
+            await bus.publish(
+                Event(
+                    EventKind.NODE_STARTED,
+                    {"id": node.id, "title": node.title},
+                )
+            )
             try:
                 rendered[node.id] = await _render_node(node, client, id_to_node)
                 if node.kind == NodeKind.PAGE:
@@ -79,10 +83,12 @@ async def run_extraction(
                 await bus.publish(Event(EventKind.NODE_DONE, {"id": node.id}))
             except Exception as exc:  # noqa: BLE001
                 result.failures.append((node.id, str(exc)))
-                await bus.publish(Event(
-                    EventKind.NODE_FAILED,
-                    {"id": node.id, "reason": str(exc)},
-                ))
+                await bus.publish(
+                    Event(
+                        EventKind.NODE_FAILED,
+                        {"id": node.id, "reason": str(exc)},
+                    )
+                )
 
         for node in all_nodes:
             if node.id not in rendered:
@@ -90,9 +96,7 @@ async def run_extraction(
             md = rendered[node.id]
             url_to_local = await _download_assets_in(md, downloader, bus)
             result.attachments_downloaded += len(url_to_local)
-            result.total_bytes += sum(
-                p.stat().st_size for p in url_to_local.values()
-            )
+            result.total_bytes += sum(p.stat().st_size for p in url_to_local.values())
 
             ctx = LinkContext(
                 from_file=paths[node.id],
@@ -118,11 +122,16 @@ async def run_extraction(
             warnings=result.warnings,
         )
         (output_dir / "_report.md").write_text(report, encoding="utf-8")
-        await bus.publish(Event(EventKind.EXTRACTION_DONE, {
-            "pages": result.pages_extracted,
-            "items": result.items_extracted,
-            "attachments": result.attachments_downloaded,
-        }))
+        await bus.publish(
+            Event(
+                EventKind.EXTRACTION_DONE,
+                {
+                    "pages": result.pages_extracted,
+                    "items": result.items_extracted,
+                    "attachments": result.attachments_downloaded,
+                },
+            )
+        )
         return result
     finally:
         await downloader.close()
@@ -149,9 +158,7 @@ async def _render_node(
     return ""
 
 
-def _render_database_index(
-    node: PlannedNode, id_to_node: dict[str, PlannedNode]
-) -> str:
+def _render_database_index(node: PlannedNode, id_to_node: dict[str, PlannedNode]) -> str:
     rows = [id_to_node[cid] for cid in node.children_ids if cid in id_to_node]
     if not rows:
         return f"# {node.title}\n"
@@ -170,10 +177,12 @@ async def _download_assets_in(
         try:
             local = await downloader.download(url)
             url_to_local[url] = local
-            await bus.publish(Event(
-                EventKind.ATTACHMENT_DOWNLOADED,
-                {"url": url, "path": str(local)},
-            ))
+            await bus.publish(
+                Event(
+                    EventKind.ATTACHMENT_DOWNLOADED,
+                    {"url": url, "path": str(local)},
+                )
+            )
         except Exception:  # noqa: BLE001
             continue
     return url_to_local

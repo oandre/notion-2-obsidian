@@ -4,16 +4,22 @@ from notion_extractor.convert.blocks import blocks_to_md
 def _embed(block_type: str, url: str, caption: str = "") -> dict:
     payload = {"url": url, "caption": []}
     if caption:
-        payload["caption"] = [{
-            "type": "text",
-            "text": {"content": caption, "link": None},
-            "plain_text": caption,
-            "href": None,
-            "annotations": {
-                "bold": False, "italic": False, "strikethrough": False,
-                "underline": False, "code": False, "color": "default",
-            },
-        }]
+        payload["caption"] = [
+            {
+                "type": "text",
+                "text": {"content": caption, "link": None},
+                "plain_text": caption,
+                "href": None,
+                "annotations": {
+                    "bold": False,
+                    "italic": False,
+                    "strikethrough": False,
+                    "underline": False,
+                    "code": False,
+                    "color": "default",
+                },
+            }
+        ]
     return {
         "type": block_type,
         block_type: payload,

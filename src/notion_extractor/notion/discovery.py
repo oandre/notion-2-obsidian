@@ -28,19 +28,23 @@ async def list_shared_roots(client: AsyncNotionClient) -> list[PlannedNode]:
     for r in results:
         obj = r.get("object")
         if obj == "page":
-            roots.append(PlannedNode(
-                id=r["id"],
-                kind=NodeKind.PAGE,
-                title=_page_title(r),
-                parent_id=None,
-            ))
+            roots.append(
+                PlannedNode(
+                    id=r["id"],
+                    kind=NodeKind.PAGE,
+                    title=_page_title(r),
+                    parent_id=None,
+                )
+            )
         elif obj == "database":
-            roots.append(PlannedNode(
-                id=r["id"],
-                kind=NodeKind.DATABASE,
-                title=rich_text_to_md(r.get("title", [])) or "Untitled",
-                parent_id=None,
-            ))
+            roots.append(
+                PlannedNode(
+                    id=r["id"],
+                    kind=NodeKind.DATABASE,
+                    title=rich_text_to_md(r.get("title", [])) or "Untitled",
+                    parent_id=None,
+                )
+            )
     return roots
 
 
@@ -52,15 +56,18 @@ async def discover_subtree(
     if root_kind == NodeKind.PAGE:
         page = await get_page(client, root_id)
         root = PlannedNode(
-            id=root_id, kind=NodeKind.PAGE,
-            title=_page_title(page), parent_id=None,
+            id=root_id,
+            kind=NodeKind.PAGE,
+            title=_page_title(page),
+            parent_id=None,
             page_data=page,
         )
         await _walk_page(client, root, collected)
     else:
         db = await get_database(client, root_id)
         root = PlannedNode(
-            id=root_id, kind=NodeKind.DATABASE,
+            id=root_id,
+            kind=NodeKind.DATABASE,
             title=rich_text_to_md(db.get("title", [])) or "Untitled",
             parent_id=None,
             page_data=db,
@@ -70,15 +77,14 @@ async def discover_subtree(
     return [root, *collected]
 
 
-async def _walk_page(
-    client: AsyncNotionClient, node: PlannedNode, out: list[PlannedNode]
-) -> None:
+async def _walk_page(client: AsyncNotionClient, node: PlannedNode, out: list[PlannedNode]) -> None:
     node.blocks = await fetch_block_children(client, node.id)
     for block in node.blocks:
         btype = block.get("type")
         if btype == "child_page":
             child = PlannedNode(
-                id=block["id"], kind=NodeKind.PAGE,
+                id=block["id"],
+                kind=NodeKind.PAGE,
                 title=block["child_page"].get("title", "Untitled"),
                 parent_id=node.id,
             )
@@ -87,7 +93,8 @@ async def _walk_page(
             await _walk_page(client, child, out)
         elif btype == "child_database":
             child = PlannedNode(
-                id=block["id"], kind=NodeKind.DATABASE,
+                id=block["id"],
+                kind=NodeKind.DATABASE,
                 title=block["child_database"].get("title", "Untitled"),
                 parent_id=node.id,
             )
@@ -103,8 +110,10 @@ async def _walk_database(
     for item in items:
         title = _page_title(item)
         item_node = PlannedNode(
-            id=item["id"], kind=NodeKind.DB_ITEM,
-            title=title, parent_id=node.id,
+            id=item["id"],
+            kind=NodeKind.DB_ITEM,
+            title=title,
+            parent_id=node.id,
             page_data=item,
         )
         node.children_ids.append(item_node.id)
