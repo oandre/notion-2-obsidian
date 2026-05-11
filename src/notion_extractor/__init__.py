@@ -1,1 +1,0 @@
-"""Notion → Obsidian extractor."""
