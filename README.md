@@ -51,14 +51,30 @@ npm run lint
 npm run build
 ```
 
-For development on the app, use two terminals:
+### Running locally (your own migration)
+
+If you cloned the repo and want to run the tool against your own Notion workspace without publishing to npm:
 
 ```bash
 cd app
-npm run dev:server     # Fastify on :8765
-# in another terminal:
-npm run dev:web        # Vite on :5173 with /api proxy
+npm install
+npm run build
+npm start
 ```
+
+The browser opens at `http://127.0.0.1:8765/`. The `.env` is read/written in the directory you ran `npm start` from, so run it from wherever you want the config and output files to live.
+
+### Working on the app (back + front with hot reload)
+
+A single command starts both processes in parallel:
+
+```bash
+cd app
+npm install
+npm run dev
+```
+
+This runs the Fastify backend (`tsx watch` on `:8765`) and the Vite dev server (`:5173` with `/api` proxy) side by side. Open **http://localhost:5173/** for HMR on the React side — API requests are proxied to Fastify automatically. Edit any `.ts` under `src/server/` and `tsx watch` restarts; edit any `.tsx` under `src/web/` and Vite hot-reloads.
 
 ## Releases
 
