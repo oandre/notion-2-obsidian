@@ -161,6 +161,37 @@ def _toggle(block: dict, ctx: RenderContext) -> str:
     return f"<details>\n<summary>{summary}</summary>\n{inner}\n</details>\n"
 
 
+def _equation_block(block: dict, _ctx: RenderContext) -> str:
+    expr = block["equation"]["expression"]
+    return f"$$\n{expr}\n$$\n"
+
+
+def _table(block: dict, _ctx: RenderContext) -> str:
+    table = block["table"]
+    width = table.get("table_width", 0)
+    has_header = table.get("has_column_header", False)
+    rows = block.get("children", [])
+
+    def render_row(cells: list[list[dict]]) -> str:
+        rendered = [rich_text_to_md(c) for c in cells]
+        padded = rendered + [""] * (width - len(rendered))
+        return "| " + " | ".join(padded) + " |\n"
+
+    out: list[str] = []
+    if has_header and rows:
+        out.append(render_row(rows[0]["table_row"]["cells"]))
+        out.append("| " + " | ".join(["---"] * width) + " |\n")
+        body = rows[1:]
+    else:
+        out.append("| " + " | ".join([""] * width) + " |\n")
+        out.append("| " + " | ".join(["---"] * width) + " |\n")
+        body = rows
+
+    for row in body:
+        out.append(render_row(row["table_row"]["cells"]))
+    return "".join(out)
+
+
 _HANDLERS: dict[str, BlockHandler] = {
     "paragraph": _paragraph,
     "heading_1": _heading(1),
@@ -173,4 +204,6 @@ _HANDLERS: dict[str, BlockHandler] = {
     "code": _code,
     "callout": _callout,
     "toggle": _toggle,
+    "equation": _equation_block,
+    "table": _table,
 }
