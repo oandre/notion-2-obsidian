@@ -260,6 +260,29 @@ def _embed_block(field: str) -> BlockHandler:
     return handler
 
 
+def _child_page(block: dict, _ctx: RenderContext) -> str:
+    page_id = block.get("id", "")
+    title = block["child_page"].get("title", "")
+    return f"{{{{notion-link:{page_id}|{title}}}}}\n"
+
+
+def _child_database(block: dict, _ctx: RenderContext) -> str:
+    db_id = block.get("id", "")
+    title = block["child_database"].get("title", "")
+    return f"{{{{notion-link:{db_id}|{title}}}}}\n"
+
+
+def _link_to_page(block: dict, _ctx: RenderContext) -> str:
+    payload = block["link_to_page"]
+    if payload.get("type") == "page_id":
+        target = payload["page_id"]
+    elif payload.get("type") == "database_id":
+        target = payload["database_id"]
+    else:
+        return ""
+    return f"{{{{notion-link:{target}}}}}\n"
+
+
 _HANDLERS: dict[str, BlockHandler] = {
     "paragraph": _paragraph,
     "heading_1": _heading(1),
@@ -282,4 +305,7 @@ _HANDLERS: dict[str, BlockHandler] = {
     "bookmark": _embed_block("bookmark"),
     "embed": _embed_block("embed"),
     "link_preview": _embed_block("link_preview"),
+    "child_page": _child_page,
+    "child_database": _child_database,
+    "link_to_page": _link_to_page,
 }
