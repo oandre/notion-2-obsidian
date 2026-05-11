@@ -7,7 +7,7 @@
   "author": "André Simões",
   "homepage": "https://github.com/oandre/notion-2-obsidian",
   "repository": { "type": "git", "url": "git+https://github.com/oandre/notion-2-obsidian.git" },
-  "bin": { "notion-2-obsidian": "dist/cli.js" },
+  "bin": { "notion-2-obsidian": "dist/bin/cli.js" },
   "files": ["dist", "README.md", "LICENSE"],
   "engines": { "node": ">=20" },
   "scripts": {
