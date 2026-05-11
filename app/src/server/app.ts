@@ -27,7 +27,7 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
     await fastify.register(fastifyStatic, {
       root: staticDir,
       prefix: '/',
-      wildcard: false,
+      index: ['index.html'],
     });
     fastify.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/')) {
@@ -111,9 +111,11 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
 }
 
 function resolveStaticDir(): string | null {
+  // app.js lives at dist/src/server/ when built (rootDir='.') or at src/server/
+  // when running via tsx. dist/web/ holds the built web assets in both cases.
   const candidates = [
-    resolve(__dirname, '../web'), // production build (dist/web)
-    resolve(__dirname, '../../dist/web'), // dev from source via tsx
+    resolve(__dirname, '../../web'), // built: dist/src/server → dist/web
+    resolve(__dirname, '../../dist/web'), // dev: src/server → dist/web
   ];
   return candidates.find((p) => existsSync(join(p, 'index.html'))) ?? null;
 }
