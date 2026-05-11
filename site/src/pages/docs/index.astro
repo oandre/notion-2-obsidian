@@ -7,17 +7,30 @@ import Default from '../../layouts/Default.astro';
 
     <h2>1. Create a Notion integration</h2>
     <ol>
-      <li>Go to <a href="https://www.notion.so/profile/integrations">notion.so/profile/integrations</a>.</li>
-      <li>Click <strong>+ New integration</strong>. Pick <strong>Internal</strong>. Name it whatever, pick your workspace.</li>
-      <li>Copy the <strong>Internal Integration Token</strong>.</li>
+      <li>Go to <a href="https://www.notion.so/profile/integrations">notion.so/profile/integrations</a> and click <strong>+ New integration</strong>.</li>
+      <li>Pick <strong>Internal</strong> (not Public). Name it whatever (e.g. "Migrate to Obsidian"), associate it with your workspace, save.</li>
+      <li>On the integration's <strong>Configuration</strong> page, set capabilities to the minimum the tool actually needs:
+        <ul>
+          <li>✅ <strong>Read content</strong></li>
+          <li>❌ Update content · ❌ Insert content (we never write to Notion)</li>
+          <li>❌ Read comments · ❌ Insert comments (v0.2 doesn't export comments)</li>
+          <li>🔘 <strong>Read user information <em>without</em> email addresses</strong> (we only use user names in <code>people</code> properties)</li>
+        </ul>
+      </li>
+      <li>Copy the <strong>Internal Integration Token</strong> (<code>ntn_...</code> or <code>secret_...</code>).</li>
     </ol>
 
     <h2>2. Share pages with the integration</h2>
-    <p>In Notion, open the page you want to migrate → click <code>···</code> → <strong>Connections</strong> → pick your integration. Sub-pages and database rows are reachable automatically.</p>
+    <p>In Notion, open each top-level page or database you want to migrate. Click the <code>···</code> menu (top-right) → <strong>Connections</strong> → pick your integration. Sub-pages and database rows are reachable automatically once their root is shared.</p>
 
     <h2>3. Run the tool</h2>
-    <pre><code>npx notion-2-obsidian@latest</code></pre>
-    <p>Your browser opens. Paste the token, pick an output folder, and select what to migrate.</p>
+    <p>Until the package is published to npm, clone the repo and build locally (requires Node 20+):</p>
+    <pre><code>git clone https://github.com/oandre/notion-2-obsidian.git
+cd notion-2-obsidian/app
+npm install
+npm run build
+npm start</code></pre>
+    <p>Your browser opens at <code>http://127.0.0.1:8765/</code>. Paste the token, pick an output folder (absolute path), and select what to migrate. Once the package is on npm you'll be able to skip the clone with <code>npx notion-2-obsidian@latest</code>.</p>
 
     <h2>What you get</h2>
     <ul>
@@ -25,6 +38,13 @@ import Default from '../../layouts/Default.astro';
       <li><strong>Databases</strong> → folders with one <code>.md</code> per row. Properties go into YAML frontmatter. The folder gets a sibling <code>.md</code> with a table linking each row.</li>
       <li><strong>Mentions, relations, link_to_page</strong> → Obsidian wikilinks (<code>[[Page Name]]</code>) if the target was also extracted. Otherwise listed in <code>_report.md</code>.</li>
       <li><strong>Attachments</strong> → downloaded to <code>assets/</code>, links rewritten to relative paths.</li>
+    </ul>
+
+    <h2>Troubleshooting</h2>
+    <ul>
+      <li><strong>"Nenhuma página/database compartilhada"</strong> — step 2 wasn't done. Share at least one top-level page with the integration inside Notion.</li>
+      <li><strong>401/403 in the log</strong> — token is wrong or revoked. Re-issue it on the integration's Configuration page and clear the <code>.env</code> next to where you ran the tool.</li>
+      <li><strong>A link shows up as plain text or <code>(link removed)</code></strong> — that page wasn't in your selection. <code>_report.md</code> lists every such case; re-run with the missing pages selected.</li>
     </ul>
 
     <h2>Known limitations</h2>
