@@ -126,6 +126,41 @@ def _code(block: dict, _ctx: RenderContext) -> str:
     return f"```{lang}\n{text}\n```\n"
 
 
+_CALLOUT_EMOJI_MAP = {
+    "💡": "tip",
+    "⚠️": "warning",
+    "❌": "danger",
+    "🚫": "danger",
+    "ℹ️": "info",
+    "✅": "success",
+    "❓": "question",
+}
+
+
+def _callout(block: dict, _ctx: RenderContext) -> str:
+    payload = block["callout"]
+    text = rich_text_to_md(payload["rich_text"])
+    icon = payload.get("icon") or {}
+    emoji = icon.get("emoji", "") if icon.get("type") == "emoji" else ""
+    callout_type = _CALLOUT_EMOJI_MAP.get(emoji, "note")
+
+    lines = [f"> [!{callout_type}]", f"> {text}"]
+    children = block.get("children", [])
+    if children:
+        child_md = _render_blocks(children, RenderContext())
+        lines.append(">")
+        for child_line in child_md.rstrip("\n").splitlines():
+            lines.append(f"> {child_line}" if child_line else ">")
+    return "\n".join(lines) + "\n"
+
+
+def _toggle(block: dict, ctx: RenderContext) -> str:
+    summary = rich_text_to_md(block["toggle"]["rich_text"])
+    children_md = _render_children(block, ctx).strip()
+    inner = f"\n{children_md}\n" if children_md else ""
+    return f"<details>\n<summary>{summary}</summary>\n{inner}\n</details>\n"
+
+
 _HANDLERS: dict[str, BlockHandler] = {
     "paragraph": _paragraph,
     "heading_1": _heading(1),
@@ -136,4 +171,6 @@ _HANDLERS: dict[str, BlockHandler] = {
     "quote": _quote,
     "divider": _divider,
     "code": _code,
+    "callout": _callout,
+    "toggle": _toggle,
 }
