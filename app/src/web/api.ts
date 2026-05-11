@@ -1,4 +1,4 @@
-import type { RootDTO } from '@shared/types';
+import type { PlannedNode } from '@shared/types';
 
 export async function getStatus(): Promise<{ tokenConfigured: boolean; outputDir: string | null }> {
   const res = await fetch('/api/status');
@@ -15,19 +15,29 @@ export async function postSetup(notionToken: string, outputDir: string): Promise
   if (!res.ok) throw new Error(`setup failed: ${res.status}`);
 }
 
-export async function getRoots(): Promise<RootDTO[]> {
-  const res = await fetch('/api/roots');
-  if (!res.ok) throw new Error(`roots failed: ${res.status}`);
+export interface TreeResponse {
+  nodes: PlannedNode[];
+  discoveredAt: string;
+  cached: boolean;
+}
+
+export async function getTree(): Promise<TreeResponse> {
+  const res = await fetch('/api/tree');
+  if (!res.ok) throw new Error(`tree failed: ${res.status}`);
   return res.json();
 }
 
-export async function startExtract(
-  selection: Array<{ id: string; kind: string }>,
-): Promise<string> {
+export async function refreshTree(): Promise<TreeResponse> {
+  const res = await fetch('/api/tree?refresh=true');
+  if (!res.ok) throw new Error(`tree refresh failed: ${res.status}`);
+  return res.json();
+}
+
+export async function startExtract(selectedIds: string[]): Promise<string> {
   const res = await fetch('/api/extract', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ selection }),
+    body: JSON.stringify({ selectedIds }),
   });
   if (!res.ok) throw new Error(`extract failed: ${res.status}`);
   const { job_id } = (await res.json()) as { job_id: string };
