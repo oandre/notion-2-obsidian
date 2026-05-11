@@ -1,44 +1,71 @@
-# notion-extractor
+# notion-2-obsidian
 
-Migrate a Notion workspace to an Obsidian vault.
+Migrate a Notion workspace to an Obsidian vault with a local web UI. Pick the pages and databases you want, get a clean vault with wikilinks, frontmatter, and downloaded attachments.
+
+> Each user runs this locally with their own Notion **internal integration**. No cloud account, no OAuth, nothing leaves your machine except the API calls to Notion.
 
 ## Setup
 
-1. Create a Notion internal integration at https://www.notion.so/profile/integrations and copy the token.
-2. Share the top-level pages/databases you want to extract with the integration (in Notion: ··· menu → Connections → your integration).
-3. `cp .env.example .env` and fill in `NOTION_TOKEN` and `OUTPUT_DIR`.
-4. `uv sync` to install dependencies.
-5. `uv run notion-extractor` and open the URL it prints.
+1. Create a Notion **internal integration** at https://www.notion.so/profile/integrations:
+   - Click *New integration* → give it a name → pick your workspace → Save.
+   - This is the *internal* integration form, not the public/OAuth one. It only asks for name + workspace. No Privacy Policy or Redirect URI needed.
+   - Copy the **Internal Integration Token** it shows you.
+2. **Share** the top-level pages/databases you want to extract with the integration:
+   - In Notion, open the page → click `···` (top-right) → `Connections` → pick your integration.
+   - Sub-pages and database rows are reachable automatically once the top-level is shared.
+3. Clone this repo and install:
+   ```bash
+   git clone https://github.com/oandre/notion-2-obsidian.git
+   cd notion-2-obsidian
+   uv sync --extra dev
+   ```
+   (Install `uv` first if you don't have it: https://docs.astral.sh/uv/)
+4. Configure:
+   ```bash
+   cp .env.example .env
+   # edit .env and fill in NOTION_TOKEN and OUTPUT_DIR
+   ```
+5. Run:
+   ```bash
+   uv run notion-extractor
+   ```
+   Open the URL it prints (default `http://127.0.0.1:8765/`). Tick the pages you want and click *Extract*.
+
+## What it produces
+
+```
+your-vault/
+├── _report.md                       # what got extracted, broken links, failures
+├── assets/                          # all downloaded images/PDFs/etc.
+├── Notes/
+│   ├── Notes.md                     # page content
+│   └── Sub-page.md
+└── Tasks/
+    ├── Tasks.md                     # index with table of items
+    ├── Do X.md                      # one .md per database row
+    └── Do Y.md
+```
+
+- A page **without** sub-pages becomes a `.md` file.
+- A page **with** sub-pages becomes a `.md` file *plus* a sibling folder of the same name. Wikilinks resolve unambiguously.
+- A database becomes a folder of one `.md` per row, plus an index `.md`. Properties go into YAML frontmatter.
+- Internal references (mentions, relations, link_to_page) become `[[Wikilinks]]`. Links pointing to pages you didn't select are listed in `_report.md`.
+
+## Conversion fidelity
+
+Supported with high fidelity: paragraphs, headings, bullet/numbered/todo lists (including nested), quotes, code blocks (language preserved), callouts (with emoji→Obsidian-type mapping), toggles (`<details>`), tables, block + inline equations (`$...$` / `$$...$$`), images, files, PDFs, video, audio, native embeds for YouTube/X/Vimeo/Loom/Figma.
+
+Known limitations: `column_list` loses its layout, `synced_block` is rendered inline (no transclusion), comments and version history are not exported (no API for them), each run overwrites the output directory (no incremental sync).
 
 ## Development
 
-- `uv run pytest` — run tests
+- `uv run pytest` — run tests (~100 tests, all mocked HTTP, no network)
 - `uv run pytest tests/convert/test_inline.py::test_bold -v` — run a single test
-- `uv run ruff check .` — lint
-- `uv run ruff format .` — format
+- `uv run ruff check .` / `uv run ruff format .` — lint / format
 - `uv run pyright` — type check
 
-## How it works
+See `CLAUDE.md` for the architecture overview and `docs/superpowers/specs/` for the original design doc.
 
-The extractor runs in three phases:
+## License
 
-1. **Discovery** — walks the workspace via `POST /v1/search` then recurses through pages/databases shared with the integration. Produces a complete `id → output path` map before fetching content. This is what allows wikilinks to be resolved correctly.
-
-2. **Extraction** — fetches blocks and properties, converts to Markdown with placeholders for internal links and attachments.
-
-3. **Resolve & write** — downloads attachments in parallel, substitutes placeholders for wikilinks (`[[Page Name]]`) and relative asset paths, writes files to disk, generates `_report.md`.
-
-## Mapping
-
-- Page with no children → `Page.md`
-- Page with children → `Page.md` + sibling `Page/` folder
-- Database → `Database.md` (index with table of items) + sibling `Database/` folder containing one `.md` per row
-- Database row properties → YAML frontmatter
-- Attachments (S3 URLs from Notion) → downloaded to `assets/`, named `<sha1[:8]>-<original>`
-
-## Known limitations
-
-- `column_list` / `column` blocks lose their layout; content is concatenated.
-- `synced_block` is rendered inline; no Obsidian transclusion equivalent.
-- Comments and version history are not exported (not available via the API).
-- Each run overwrites the output directory. There is no incremental sync.
+MIT. See [LICENSE](LICENSE).

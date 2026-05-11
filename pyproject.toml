@@ -1,8 +1,11 @@
 [project]
-name = "notion-extractor"
+name = "notion-2-obsidian"
 version = "0.1.0"
 description = "Migrate Notion workspaces to Obsidian vaults"
+license = "MIT"
+readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "André Simões" }]
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
