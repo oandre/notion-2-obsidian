@@ -4,7 +4,6 @@ import type { PlannedNode } from '@shared/types';
 import { stringify as yamlStringify } from 'yaml';
 import { blocksToMd } from '../convert/blocks.js';
 import { propertiesToFrontmatter } from '../convert/properties.js';
-import type { NotionClient } from '../notion/client.js';
 import type { EventBus } from '../progress.js';
 import { AttachmentDownloader } from './attachments.js';
 import { planPaths } from './plan.js';
@@ -25,7 +24,6 @@ export interface ExtractionResult {
 }
 
 export interface RunExtractionOpts {
-  client: NotionClient;
   bus: EventBus;
   outputDir: string;
   tree: PlannedNode[];
@@ -33,8 +31,7 @@ export interface RunExtractionOpts {
 }
 
 export async function runExtraction(opts: RunExtractionOpts): Promise<ExtractionResult> {
-  const { client, bus, outputDir, tree, selectedIds } = opts;
-  void client; // reserved for future asset auth needs
+  const { bus, outputDir, tree, selectedIds } = opts;
   const startedAt = Date.now();
   await mkdir(outputDir, { recursive: true });
   const downloader = new AttachmentDownloader(join(outputDir, 'assets'));
@@ -49,11 +46,10 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
     warnings: [],
   };
 
-  const effective = expandSelectionToDescendants(new Set(selectedIds), tree);
-  const idToNode = new Map(tree.map((n) => [n.id, n]));
-  const paths = planPaths(tree, outputDir);
-
   try {
+    const effective = expandSelectionToDescendants(new Set(selectedIds), tree);
+    const idToNode = new Map(tree.map((n) => [n.id, n]));
+    const paths = planPaths(tree, outputDir);
     const rendered = new Map<string, string>();
     for (const node of tree) {
       if (!effective.has(node.id)) continue;

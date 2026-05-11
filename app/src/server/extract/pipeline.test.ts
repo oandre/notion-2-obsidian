@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import type { PlannedNode } from '@shared/types';
 import { type Dispatcher, MockAgent, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { NotionClient } from '../notion/client.js';
 import { EventBus } from '../progress.js';
 import { runExtraction } from './pipeline.js';
 
@@ -77,10 +76,8 @@ describe('runExtraction (tree-driven)', () => {
       }),
     ];
 
-    const client = new NotionClient({ token: 't' });
     const bus = new EventBus();
     const result = await runExtraction({
-      client,
       bus,
       outputDir: dir,
       tree,
@@ -113,10 +110,8 @@ describe('runExtraction (tree-driven)', () => {
       makeNode({ id: 'cp', kind: 'page', title: 'Beta', parentId: 'p1' }),
     ];
 
-    const client = new NotionClient({ token: 't' });
     const bus = new EventBus();
     await runExtraction({
-      client,
       bus,
       outputDir: dir,
       tree,
@@ -142,10 +137,8 @@ describe('runExtraction (tree-driven)', () => {
       }),
     ];
 
-    const client = new NotionClient({ token: 't' });
     const bus = new EventBus();
     await runExtraction({
-      client,
       bus,
       outputDir: dir,
       tree,
