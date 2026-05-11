@@ -3,12 +3,13 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
-import type { NodeKind } from '@shared/types';
+import type { PlannedNode } from '@shared/types';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { type CachedTree, invalidateCache, loadCache, saveCache } from './cache.js';
 import { loadSettings, writeSettings } from './config.js';
 import { runExtraction } from './extract/pipeline.js';
 import { NotionClient } from './notion/client.js';
-import { listSharedRoots } from './notion/discovery.js';
+import { discoverWorkspace, listSharedRoots } from './notion/discovery.js';
 import { EventBus, eventToSse } from './progress.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,7 @@ export interface BuildAppOpts {
 export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
   const fastify = Fastify({ logger: false });
   const jobs = new Map<string, EventBus>();
+  let latestTree: PlannedNode[] | null = null;
 
   const staticDir = resolveStaticDir();
   if (staticDir) {
@@ -53,40 +55,78 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
         return reply.code(400).send({ error: 'notionToken and outputDir are required' });
       }
       await writeSettings(opts.cwd, { notionToken, outputDir });
+      latestTree = null;
       return reply.code(204).send();
     },
   );
 
-  fastify.get('/api/roots', async (_req, reply) => {
+  fastify.get<{ Querystring: { refresh?: string } }>('/api/tree', async (req, reply) => {
     const settings = await loadSettings(opts.cwd);
-    if (!settings.notionToken) {
-      return reply.code(412).send({ error: 'token not configured' });
+    if (!settings.notionToken || !settings.outputDir) {
+      return reply.code(412).send({ error: 'not configured' });
     }
+    const refresh = req.query.refresh === 'true';
     const client = new NotionClient({ token: settings.notionToken });
+
+    // workspaceId for cache validity, derived from the set of root ids
     const roots = await listSharedRoots(client);
-    return roots.map((r) => ({ id: r.id, kind: r.kind, title: r.title }));
+    const workspaceId = pickWorkspaceId(roots);
+
+    if (!refresh) {
+      const cached = await loadCache(settings.outputDir, workspaceId);
+      if (cached) {
+        latestTree = cached.nodes;
+        return {
+          nodes: cached.nodes,
+          discoveredAt: cached.discoveredAt,
+          cached: true,
+        };
+      }
+    } else {
+      await invalidateCache(settings.outputDir);
+    }
+
+    const nodes = await discoverWorkspace(client);
+    const discoveredAt = new Date().toISOString();
+    const tree: CachedTree = {
+      version: 1,
+      workspaceId,
+      discoveredAt,
+      nodes,
+    };
+    try {
+      await saveCache(settings.outputDir, tree);
+    } catch {
+      // permission errors are non-fatal — we still have the tree in memory
+    }
+    latestTree = nodes;
+    return { nodes, discoveredAt, cached: false };
   });
 
-  fastify.post<{ Body: { selection: Array<{ id: string; kind: NodeKind }> } }>(
-    '/api/extract',
-    async (req, reply) => {
-      const settings = await loadSettings(opts.cwd);
-      if (!settings.notionToken || !settings.outputDir) {
-        return reply.code(412).send({ error: 'not configured' });
-      }
-      const bus = new EventBus();
-      const jobId = randomUUID();
-      jobs.set(jobId, bus);
-      const client = new NotionClient({ token: settings.notionToken });
-      void runExtraction({
-        client,
-        bus,
-        outputDir: settings.outputDir,
-        rootSelection: req.body.selection,
-      });
-      return { job_id: jobId };
-    },
-  );
+  fastify.post<{ Body: { selectedIds: string[] } }>('/api/extract', async (req, reply) => {
+    const settings = await loadSettings(opts.cwd);
+    if (!settings.notionToken || !settings.outputDir) {
+      return reply.code(412).send({ error: 'not configured' });
+    }
+    if (!latestTree) {
+      return reply.code(412).send({ error: 'call /api/tree first' });
+    }
+    const { selectedIds } = req.body;
+    if (!Array.isArray(selectedIds)) {
+      return reply.code(400).send({ error: 'selectedIds[] required' });
+    }
+
+    const bus = new EventBus();
+    const jobId = randomUUID();
+    jobs.set(jobId, bus);
+    void runExtraction({
+      bus,
+      outputDir: settings.outputDir,
+      tree: latestTree,
+      selectedIds,
+    });
+    return { job_id: jobId };
+  });
 
   fastify.get<{ Querystring: { job?: string } }>('/api/events', async (req, reply) => {
     const job = req.query.job;
@@ -110,12 +150,17 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
   return fastify;
 }
 
+function pickWorkspaceId(roots: PlannedNode[]): string | null {
+  // Notion's /search results don't reliably surface a workspace UUID,
+  // so use a derived id from the sorted set of root ids. If the token
+  // suddenly points to a different workspace (different set of shared
+  // roots), this id changes and the cache invalidates.
+  const ids = roots.map((r) => r.id).sort();
+  if (ids.length === 0) return null;
+  return ids.slice(0, 3).join('|');
+}
+
 function resolveStaticDir(): string | null {
-  // app.js lives at dist/src/server/ when built (rootDir='.') or at src/server/
-  // when running via tsx. dist/web/ holds the built web assets in both cases.
-  const candidates = [
-    resolve(__dirname, '../../web'), // built: dist/src/server → dist/web
-    resolve(__dirname, '../../dist/web'), // dev: src/server → dist/web
-  ];
+  const candidates = [resolve(__dirname, '../../web'), resolve(__dirname, '../../dist/web')];
   return candidates.find((p) => existsSync(join(p, 'index.html'))) ?? null;
 }
