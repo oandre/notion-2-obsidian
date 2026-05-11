@@ -6,10 +6,21 @@
   "license": "MIT",
   "author": "André Simões",
   "homepage": "https://github.com/oandre/notion-2-obsidian",
-  "repository": { "type": "git", "url": "git+https://github.com/oandre/notion-2-obsidian.git" },
-  "bin": { "notion-2-obsidian": "dist/bin/cli.js" },
-  "files": ["dist", "README.md", "LICENSE"],
-  "engines": { "node": ">=20" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oandre/notion-2-obsidian.git"
+  },
+  "bin": {
+    "notion-2-obsidian": "dist/bin/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev:server": "tsx watch bin/cli.ts",
     "dev:web": "vite",
@@ -34,6 +45,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.8.3",
+    "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.0.1",
     "@types/node": "^20.16.5",
     "@types/react": "^18.3.5",
