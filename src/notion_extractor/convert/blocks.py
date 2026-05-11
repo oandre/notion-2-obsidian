@@ -228,6 +228,38 @@ def _file_like(field: str) -> BlockHandler:
     return handler
 
 
+_OBSIDIAN_EMBED_HOSTS = {
+    "www.youtube.com", "youtube.com", "youtu.be",
+    "twitter.com", "x.com",
+    "vimeo.com",
+    "loom.com", "www.loom.com",
+    "figma.com", "www.figma.com",
+}
+
+
+def _is_embeddable(url: str) -> bool:
+    return urlparse(url).hostname in _OBSIDIAN_EMBED_HOSTS
+
+
+def _display_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.path and parsed.path != "/":
+        return f"{parsed.hostname}{parsed.path}"
+    return parsed.hostname or url
+
+
+def _embed_block(field: str) -> BlockHandler:
+    def handler(block: dict, _ctx: RenderContext) -> str:
+        payload = block[field]
+        url = payload.get("url", "")
+        caption = rich_text_to_md(payload.get("caption") or [])
+        if _is_embeddable(url):
+            return f"![{caption}]({url})\n"
+        display = caption or _display_url(url)
+        return f"[{display}]({url})\n"
+    return handler
+
+
 _HANDLERS: dict[str, BlockHandler] = {
     "paragraph": _paragraph,
     "heading_1": _heading(1),
@@ -247,4 +279,7 @@ _HANDLERS: dict[str, BlockHandler] = {
     "file": _file_like("file"),
     "video": _file_like("video"),
     "audio": _file_like("audio"),
+    "bookmark": _embed_block("bookmark"),
+    "embed": _embed_block("embed"),
+    "link_preview": _embed_block("link_preview"),
 }
