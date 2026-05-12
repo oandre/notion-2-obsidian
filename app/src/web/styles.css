@@ -174,6 +174,13 @@ pre.log {
 .discovery-progress .roots-list .failed {
   color: #b04545;
 }
+.discovery-progress .roots-list .waiting-summary {
+  color: #999;
+  font-style: italic;
+  padding-top: 0.5rem;
+  border-top: 1px solid #eee;
+  margin-top: 0.3rem;
+}
 .discovery-progress .meta {
   font-size: 0.85rem;
   color: #777;

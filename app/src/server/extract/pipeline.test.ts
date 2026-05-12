@@ -211,10 +211,18 @@ describe('runExtraction events (v0.4 phase + planned)', () => {
       .map((e) => (e.data as { name: string }).name);
     expect(phases).toEqual(['render', 'download', 'write']);
 
+    // node_started fires during the (serial) render phase, in tree order.
     const nodeStarted = collected.find((e) => e.kind === 'node_started');
     expect(nodeStarted?.data).toMatchObject({ id: 'p1', title: 'Hello', kind: 'page' });
 
-    const nodeWriting = collected.find((e) => e.kind === 'node_writing');
-    expect(nodeWriting?.data).toMatchObject({ id: 'p1', title: 'Hello' });
+    // node_writing fires during the (parallel) write phase, so order is
+    // non-deterministic — just check that 'p1' got one and that each event
+    // carries id + title.
+    const nodeWritings = collected.filter((e) => e.kind === 'node_writing');
+    expect(nodeWritings.length).toBeGreaterThan(0);
+    for (const ev of nodeWritings) {
+      expect(ev.data).toMatchObject({ id: expect.any(String), title: expect.any(String) });
+    }
+    expect(nodeWritings.some((e) => (e.data as { id: string }).id === 'p1')).toBe(true);
   });
 });

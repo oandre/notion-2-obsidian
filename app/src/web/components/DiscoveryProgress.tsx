@@ -1,11 +1,13 @@
 import type { PlannedNode } from '@shared/types';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+type RootStatus = 'waiting' | 'active' | 'done' | 'failed';
 
 interface RootSummary {
   id: string;
   title: string;
   kind: string;
-  status: 'pending' | 'active' | 'done' | 'failed';
+  status: RootStatus;
   pages: number;
   databases: number;
   dbItems: number;
@@ -20,7 +22,6 @@ interface Props {
 export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
   const [discovered, setDiscovered] = useState(0);
   const [totalRoots, setTotalRoots] = useState(0);
-  const [rootsCompleted, setRootsCompleted] = useState(0);
   const [currentText, setCurrentText] = useState('');
   const [roots, setRoots] = useState<RootSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -45,15 +46,18 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
     });
 
     source.addEventListener('root_started', (e) => {
+      // 'root_started' fires the moment Promise.all queues the walk —
+      // including all the ones that are sitting in p-limit(3)'s queue
+      // waiting for a slot. Mark them as 'waiting'; we promote to
+      // 'active' the first time we see a 'discovery_progress' for them.
       const data = JSON.parse((e as MessageEvent).data) as {
         id: string;
         title: string;
         kind: string;
       };
-      setCurrentText(`Mapeando "${data.title}"`);
       setRoots((prev) => [
         ...prev,
-        { ...data, status: 'active', pages: 0, databases: 0, dbItems: 0 },
+        { ...data, status: 'waiting', pages: 0, databases: 0, dbItems: 0 },
       ]);
     });
 
@@ -65,6 +69,13 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
       };
       setDiscovered(data.discovered);
       if (data.title) setCurrentText(`Mapeando "${data.title}"`);
+      if (data.currentRoot) {
+        setRoots((prev) =>
+          prev.map((r) =>
+            r.id === data.currentRoot && r.status === 'waiting' ? { ...r, status: 'active' } : r,
+          ),
+        );
+      }
     });
 
     source.addEventListener('root_done', (e) => {
@@ -88,7 +99,6 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
             : r,
         ),
       );
-      setRootsCompleted((n) => n + 1);
     });
 
     source.addEventListener('root_failed', (e) => {
@@ -102,7 +112,6 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
           r.id === data.id ? { ...r, status: 'failed', failureReason: data.reason } : r,
         ),
       );
-      setRootsCompleted((n) => n + 1);
     });
 
     source.addEventListener('tree_ready', (e) => {
@@ -126,8 +135,19 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
     return () => source.close();
   }, [jobId]);
 
+  const { counts, completed, waiting, visible } = useMemo(() => {
+    const c = { waiting: 0, active: 0, done: 0, failed: 0 };
+    for (const r of roots) c[r.status]++;
+    return {
+      counts: c,
+      completed: c.done + c.failed,
+      waiting: roots.filter((r) => r.status === 'waiting'),
+      visible: roots.filter((r) => r.status !== 'waiting'),
+    };
+  }, [roots]);
+
   const barProps =
-    totalRoots > 0 ? { value: rootsCompleted, max: totalRoots } : ({} as Record<string, never>);
+    totalRoots > 0 ? { value: completed, max: totalRoots } : ({} as Record<string, never>);
 
   return (
     <div className="discovery-progress">
@@ -137,11 +157,11 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
       <progress {...barProps} />
       {totalRoots > 0 && (
         <p className="meta">
-          {rootsCompleted}/{totalRoots} raízes
+          {completed}/{totalRoots} raízes · {counts.active} ativas · {counts.waiting} aguardando
         </p>
       )}
       <ul className="roots-list">
-        {roots.map((r) => {
+        {visible.map((r) => {
           if (r.status === 'failed') {
             return (
               <li key={r.id} className="failed">
@@ -150,20 +170,32 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
               </li>
             );
           }
-          const summary =
-            r.status === 'done'
-              ? ` (${r.pages} pages${r.databases ? `, ${r.databases} db` : ''}${r.dbItems ? `, ${r.dbItems} items` : ''})`
-              : r.status === 'active'
-                ? ' (em progresso)'
-                : '';
-          const marker = r.status === 'done' ? '✓' : r.status === 'active' ? '⟳' : '·';
+          if (r.status === 'active') {
+            return (
+              <li key={r.id} className="active">
+                ⟳ {r.title} (em progresso)
+              </li>
+            );
+          }
+          // done
+          const summary = ` (${r.pages} pages${r.databases ? `, ${r.databases} db` : ''}${r.dbItems ? `, ${r.dbItems} items` : ''})`;
           return (
-            <li key={r.id} className={r.status}>
-              {marker} {r.title}
+            <li key={r.id} className="done">
+              ✓ {r.title}
               {summary}
             </li>
           );
         })}
+        {waiting.length > 0 && (
+          <li className="waiting-summary">
+            … {waiting.length} aguardando (
+            {waiting
+              .slice(0, 5)
+              .map((r) => r.title)
+              .join(', ')}
+            {waiting.length > 5 ? ', …' : ''})
+          </li>
+        )}
       </ul>
       {error && <p className="err">{error}</p>}
     </div>

@@ -43,21 +43,40 @@ afterEach(() => {
 });
 
 describe('DiscoveryProgress', () => {
-  it('shows counter, current root, and calls onTreeReady when tree_ready arrives', async () => {
+  // Helper: match against the concatenated textContent of any element,
+  // since our DOM splits "X aguardando" across multiple text nodes.
+  function bodyContains(needle: string): () => boolean {
+    return () => document.body.textContent?.includes(needle) ?? false;
+  }
+
+  it('shows counter, promotes waiting → active, and calls onTreeReady when tree_ready arrives', async () => {
     const onTreeReady = vi.fn();
     render(<DiscoveryProgress jobId="job-1" onTreeReady={onTreeReady} />);
     const es = FakeEventSource.instances[0]!;
 
-    es.emit('roots_listed', { count: 1 });
-    expect(await screen.findByText(/Encontradas 1 ra/i)).toBeTruthy();
+    es.emit('roots_listed', { count: 2 });
+    await waitFor(() => expect(bodyContains('Encontradas 2 raízes')()).toBe(true));
 
+    // Both roots are queued. They appear collapsed under "aguardando".
     es.emit('root_started', { id: 'p1', title: 'Notas', kind: 'page' });
-    expect(await screen.findByText(/Mapeando "Notas"/)).toBeTruthy();
+    es.emit('root_started', { id: 'p2', title: 'Outra', kind: 'page' });
+    await waitFor(() => expect(bodyContains('2 aguardando')()).toBe(true));
+    // Individually NOT shown while waiting
+    expect(screen.queryByText(/Notas \(em progresso\)/)).toBeNull();
 
-    es.emit('discovery_progress', { discovered: 5, currentRoot: 'p1' });
-    expect(await screen.findByText(/5 nós encontrados/)).toBeTruthy();
+    // First discovery_progress promotes p1 to active and bumps the counter.
+    es.emit('discovery_progress', {
+      discovered: 5,
+      currentRoot: 'p1',
+      title: 'Um filho',
+    });
+    await waitFor(() => expect(bodyContains('5 nós encontrados')()).toBe(true));
+    expect(await screen.findByText(/Notas \(em progresso\)/)).toBeTruthy();
+    expect(await screen.findByText(/Mapeando "Um filho"/)).toBeTruthy();
 
     es.emit('root_done', { id: 'p1', title: 'Notas', pages: 3, databases: 0, dbItems: 0 });
+    await waitFor(() => expect(bodyContains('Notas')()).toBe(true));
+    await waitFor(() => expect(bodyContains('(3 pages)')()).toBe(true));
 
     const nodes: PlannedNode[] = [
       {
