@@ -49,7 +49,9 @@ npm start</code></pre>
     </ul>
 
     <h2>Workspace tree cache</h2>
-    <p>The first time you open the picker, the tool walks every page and database your integration can see — for big workspaces this can take a minute. The result is cached at <code>&lt;output&gt;/.notion-2-obsidian-cache.json</code> so subsequent opens are instant. Hit the <strong>↻ Refresh</strong> button in the picker header to re-walk the workspace whenever you've added or moved pages in Notion.</p>
+    <p>The first time you open the picker, the tool walks every page and database your integration can see — for big workspaces this can take a minute. The result is cached at <code>&lt;output&gt;/.notion-2-obsidian-cache.json</code> so subsequent opens are instant.</p>
+    <p>While the first walk is in progress, the UI shows live feedback: a running counter of nodes mapped so far, the current root being walked (e.g. "Mapeando 'Notas'"), and a per-root summary as each one finishes. Hit the <strong>↻ Refresh</strong> button in the picker header to re-walk the workspace whenever you've added or moved pages in Notion.</p>
+    <p>During extraction, you'll see total counts (pages, items, databases), the current phase (rendering blocks vs downloading attachments and writing files), and a live log of each node by title.</p>
 
     <h2>Known limitations</h2>
     <ul>

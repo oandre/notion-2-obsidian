@@ -76,6 +76,12 @@ Full conversion details: https://oandre.github.io/notion-2-obsidian/docs/
 - **Want to start over** — delete the output directory and re-run. Each run overwrites everything (except the `.notion-2-obsidian-cache.json` cache file at the root — see below).
 - **Workspace tree feels out of date** — the picker caches the workspace structure in `<output>/.notion-2-obsidian-cache.json` so reopens are instant. Click the **↻ Refresh** button in the picker header to re-walk the workspace. The cache also invalidates automatically if the token suddenly points to a different workspace.
 
+## Progress feedback
+
+When you first open the picker, the tool walks every page and database the integration can see. The discovery UI shows what it's doing in real time: how many nodes have been mapped so far, which root is being walked right now, and a per-root summary as each one finishes ("Notas: 12 pages, 1 database"). On a cache hit, the picker opens instantly without the discovery phase.
+
+During extraction, the progress UI shows the total number of nodes about to be processed, the current phase (rendering blocks vs downloading attachments and writing files), and a rolling log of each node with its title.
+
 ## Development
 
 Two independent npm projects: `app/` (the CLI) and `site/` (the Astro landing/docs at GitHub Pages).
