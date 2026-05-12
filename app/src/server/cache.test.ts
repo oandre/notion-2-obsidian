@@ -40,20 +40,23 @@ describe('cache', () => {
 
   it('loadCache returns null when file is absent', async () => {
     const dir = await tmp();
-    expect(await loadCache(dir, 'ws-1')).toBeNull();
+    expect(await loadCache(dir)).toBeNull();
   });
 
-  it('loadCache returns the tree when file matches workspaceId and version', async () => {
+  it('loadCache returns the tree when file is valid', async () => {
     const dir = await tmp();
     await saveCache(dir, fixture());
-    const got = await loadCache(dir, 'ws-1');
+    const got = await loadCache(dir);
     expect(got?.nodes[0]?.id).toBe('p1');
   });
 
-  it('loadCache returns null when workspaceId mismatches', async () => {
+  it('loadCache returns the tree even when workspaceId would have mismatched before', async () => {
+    // workspaceId validation moved to discovery — caller decides what to do
+    // with a stale workspace. loadCache no longer rejects on this basis.
     const dir = await tmp();
-    await saveCache(dir, fixture());
-    expect(await loadCache(dir, 'ws-OTHER')).toBeNull();
+    await saveCache(dir, { ...fixture(), workspaceId: 'ws-different' });
+    const got = await loadCache(dir);
+    expect(got?.workspaceId).toBe('ws-different');
   });
 
   it('loadCache returns null when version mismatches', async () => {
@@ -63,20 +66,20 @@ describe('cache', () => {
       JSON.stringify({ ...fixture(), version: 99 }),
       'utf8',
     );
-    expect(await loadCache(dir, 'ws-1')).toBeNull();
+    expect(await loadCache(dir)).toBeNull();
   });
 
   it('loadCache returns null when JSON is malformed', async () => {
     const dir = await tmp();
     await writeFile(join(dir, '.notion-2-obsidian-cache.json'), '{ not json', 'utf8');
-    expect(await loadCache(dir, 'ws-1')).toBeNull();
+    expect(await loadCache(dir)).toBeNull();
   });
 
   it('invalidateCache removes the file (idempotent)', async () => {
     const dir = await tmp();
     await saveCache(dir, fixture());
     await invalidateCache(dir);
-    expect(await loadCache(dir, 'ws-1')).toBeNull();
+    expect(await loadCache(dir)).toBeNull();
     await invalidateCache(dir);
   });
 });

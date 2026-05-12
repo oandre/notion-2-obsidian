@@ -82,13 +82,8 @@ describe('Fastify app — v0.3', () => {
     const { app, cwd } = await setupApp();
     const pool = mock.get('https://api.notion.com');
 
-    // First /v1/search call: cache-miss check (in the handler)
-    pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
-      results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
-      next_cursor: null,
-      has_more: false,
-    });
-    // Second /v1/search call: inside discoverWorkspace (in the bg)
+    // The handler no longer calls /v1/search upfront — only the
+    // background discovery does. One intercept is enough.
     pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
       results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
       next_cursor: null,
@@ -132,12 +127,7 @@ describe('Fastify app — v0.3', () => {
     const { app, cwd } = await setupApp();
     const pool = mock.get('https://api.notion.com');
 
-    // First call: miss → discovery
-    pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
-      results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
-      next_cursor: null,
-      has_more: false,
-    });
+    // First call: cache miss → background discovery (one /v1/search call)
     pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
       results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
       next_cursor: null,
@@ -162,13 +152,8 @@ describe('Fastify app — v0.3', () => {
       }
     }
 
-    // Second /api/tree call: cache hit, only the workspaceId-key /v1/search needed
-    pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
-      results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
-      next_cursor: null,
-      has_more: false,
-    });
-
+    // Second /api/tree call: cache hit, NO Notion API calls needed
+    // (the handler now trusts the cache without re-checking workspaceId).
     const res = await app.inject({ method: 'GET', url: '/api/tree' });
     expect(res.statusCode).toBe(200);
     const body = res.json() as {

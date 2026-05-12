@@ -9,7 +9,7 @@ import { type CachedTree, invalidateCache, loadCache, saveCache } from './cache.
 import { loadSettings, writeSettings } from './config.js';
 import { runExtraction } from './extract/pipeline.js';
 import { NotionClient } from './notion/client.js';
-import { discoverWorkspace, listSharedRoots } from './notion/discovery.js';
+import { discoverWorkspace } from './notion/discovery.js';
 import { EventBus, eventToSse } from './progress.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,13 +66,16 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
       return reply.code(412).send({ error: 'not configured' });
     }
     const refresh = req.query.refresh === 'true';
-    const client = new NotionClient({ token: settings.notionToken });
+    const outputDir = settings.outputDir;
+    const token = settings.notionToken;
 
-    const roots = await listSharedRoots(client);
-    const workspaceId = pickWorkspaceId(roots);
-
+    // Cache lookup must NOT depend on an upfront Notion API call:
+    // doing /v1/search before returning would block the response and
+    // leave the frontend stuck on a generic spinner. Trust the file
+    // on disk; the user can hit Refresh if the token now points to
+    // a different workspace.
     if (!refresh) {
-      const cached = await loadCache(settings.outputDir, workspaceId);
+      const cached = await loadCache(outputDir);
       if (cached) {
         latestTree = cached.nodes;
         return {
@@ -82,19 +85,21 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
         };
       }
     } else {
-      await invalidateCache(settings.outputDir);
+      await invalidateCache(outputDir);
     }
 
-    // Cache miss → background discovery + SSE job
+    // Cache miss → background discovery + SSE job. Return immediately
+    // so the frontend can subscribe to /api/events?job=<id>.
     const bus = new EventBus();
     const jobId = randomUUID();
     jobs.set(jobId, bus);
 
-    const outputDir = settings.outputDir;
     void (async () => {
       await bus.publish({ kind: 'discovery_started', data: {} });
       try {
+        const client = new NotionClient({ token });
         const nodes = await discoverWorkspace(client, bus);
+        const workspaceId = pickWorkspaceId(nodes);
         const discoveredAt = new Date().toISOString();
         const tree: CachedTree = {
           version: 1,
@@ -171,12 +176,15 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
   return fastify;
 }
 
-function pickWorkspaceId(roots: PlannedNode[]): string | null {
-  // Notion's /search results don't reliably surface a workspace UUID,
-  // so use a derived id from the sorted set of root ids. If the token
-  // suddenly points to a different workspace (different set of shared
-  // roots), this id changes and the cache invalidates.
-  const ids = roots.map((r) => r.id).sort();
+function pickWorkspaceId(nodes: PlannedNode[]): string | null {
+  // Stable identifier derived from the sorted set of root ids
+  // (parentId === null). Persisted in the cache JSON for debugging
+  // and as a passive consistency hint — we no longer reject a cache
+  // load on mismatch, but it's useful metadata to inspect.
+  const ids = nodes
+    .filter((n) => n.parentId === null)
+    .map((n) => n.id)
+    .sort();
   if (ids.length === 0) return null;
   return ids.slice(0, 3).join('|');
 }

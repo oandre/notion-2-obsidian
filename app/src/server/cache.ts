@@ -12,10 +12,7 @@ export interface CachedTree {
   nodes: PlannedNode[];
 }
 
-export async function loadCache(
-  outputDir: string,
-  expectedWorkspaceId: string | null,
-): Promise<CachedTree | null> {
+export async function loadCache(outputDir: string): Promise<CachedTree | null> {
   let raw: string;
   try {
     raw = await readFile(join(outputDir, FILENAME), 'utf8');
@@ -29,7 +26,6 @@ export async function loadCache(
     return null;
   }
   if (parsed.version !== CURRENT_VERSION) return null;
-  if (parsed.workspaceId !== expectedWorkspaceId) return null;
   if (!Array.isArray(parsed.nodes)) return null;
   return parsed;
 }
