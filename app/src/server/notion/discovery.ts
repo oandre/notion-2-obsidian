@@ -23,8 +23,26 @@ export async function listSharedRoots(client: NotionClient): Promise<PlannedNode
     cursor = page.next_cursor;
   }
 
+  // /search returns EVERY page/database the integration can see, including
+  // descendants of shared roots. Walking each as an independent root would
+  // multiply work (and produce duplicate PlannedNodes for the same id).
+  // Keep only items whose parent is the workspace OR whose parent is not
+  // in the result set (case where the integration was shared directly with
+  // a sub-page, not its ancestor).
+  const resultIds = new Set(results.map((r) => r.id as string));
+  const isRoot = (r: Block): boolean => {
+    const parent = r.parent;
+    if (!parent) return true;
+    if (parent.type === 'workspace') return true;
+    if (parent.type === 'page_id') return !resultIds.has(parent.page_id);
+    if (parent.type === 'database_id') return !resultIds.has(parent.database_id);
+    if (parent.type === 'block_id') return !resultIds.has(parent.block_id);
+    return true;
+  };
+
   const roots: PlannedNode[] = [];
   for (const r of results) {
+    if (!isRoot(r)) continue;
     if (r.object === 'page') {
       roots.push(makeNode(r.id, 'page', pageTitle(r), null));
     } else if (r.object === 'database') {

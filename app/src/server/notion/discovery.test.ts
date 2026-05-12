@@ -64,6 +64,44 @@ describe('listSharedRoots', () => {
     expect(roots.find((r) => r.id === 'p1')?.title).toBe('Notas');
     expect(roots.find((r) => r.id === 'd1')?.title).toBe('Tarefas');
   });
+
+  it('filters out items whose parent is another item in the result set', async () => {
+    const pool = mock.get('https://api.notion.com');
+    pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
+      results: [
+        // True top-level page
+        {
+          object: 'page',
+          id: 'top',
+          parent: { type: 'workspace' },
+          properties: { title: { type: 'title', title: [rich('Top')] } },
+        },
+        // Sub-page of 'top' — should be filtered out
+        {
+          object: 'page',
+          id: 'sub',
+          parent: { type: 'page_id', page_id: 'top' },
+          properties: { title: { type: 'title', title: [rich('Sub')] } },
+        },
+        // Database item of a non-shared parent database — should remain
+        // (parent not in result set means we have direct access through it)
+        {
+          object: 'page',
+          id: 'orphan',
+          parent: { type: 'database_id', database_id: 'not-in-results' },
+          properties: { title: { type: 'title', title: [rich('Orphan')] } },
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    const client = new NotionClient({ token: 't' });
+    const roots = await listSharedRoots(client);
+    const ids = new Set(roots.map((r) => r.id));
+    expect(ids).toEqual(new Set(['top', 'orphan']));
+    expect(ids.has('sub')).toBe(false);
+  });
 });
 
 describe('discoverSubtree', () => {
