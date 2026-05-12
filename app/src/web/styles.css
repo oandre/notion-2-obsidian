@@ -82,6 +82,9 @@ pre.log {
 .log-line.done {
   color: #88f0a0;
 }
+.log-line.writing {
+  color: #88c2ff;
+}
 .tree-header {
   display: flex;
   justify-content: space-between;
