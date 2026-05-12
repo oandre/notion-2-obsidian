@@ -15,11 +15,9 @@ export async function postSetup(notionToken: string, outputDir: string): Promise
   if (!res.ok) throw new Error(`setup failed: ${res.status}`);
 }
 
-export interface TreeResponse {
-  nodes: PlannedNode[];
-  discoveredAt: string;
-  cached: boolean;
-}
+export type TreeResponse =
+  | { cached: true; nodes: PlannedNode[]; discoveredAt: string }
+  | { cached: false; job_id: string };
 
 export async function getTree(): Promise<TreeResponse> {
   const res = await fetch('/api/tree');
