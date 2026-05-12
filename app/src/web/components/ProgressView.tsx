@@ -4,12 +4,18 @@ interface Props {
   jobId: string;
 }
 
-type LogEntry = { text: string; cls: 'done' | 'failed' | '' };
+type LogEntry = { text: string; cls: 'done' | 'failed' | 'writing' | '' };
+
+const PHASE_LABEL: Record<string, string> = {
+  render: 'Renderizando blocos',
+  download_and_write: 'Baixando anexos e escrevendo arquivos',
+};
 
 export function ProgressView({ jobId }: Props) {
-  const [status, setStatus] = useState('Iniciando…');
+  const [phase, setPhase] = useState('Iniciando…');
   const [done, setDone] = useState(0);
   const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<string | null>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
   const logRef = useRef<HTMLPreElement>(null);
 
@@ -18,25 +24,67 @@ export function ProgressView({ jobId }: Props) {
     const append = (text: string, cls: LogEntry['cls'] = '') =>
       setLog((prev) => [...prev, { text, cls }]);
 
-    source.addEventListener('discovery_started', () => append('Descoberta iniciada'));
-    source.addEventListener('discovery_done', (e) => {
-      const d = JSON.parse((e as MessageEvent).data);
-      setTotal(d.total);
-      setStatus(`Descobertos ${d.total} nós. Extraindo…`);
-      append(`Descobertos ${d.total} nós`);
+    source.addEventListener('extraction_planned', (e) => {
+      const data = JSON.parse((e as MessageEvent).data) as {
+        totalPages: number;
+        totalDbItems: number;
+        totalDatabases: number;
+        totalNodes: number;
+      };
+      setTotal(data.totalNodes);
+      setSummary(
+        `${data.totalNodes} nós (${data.totalPages} páginas, ${data.totalDbItems} items, ${data.totalDatabases} db)`,
+      );
     });
+
+    source.addEventListener('phase_started', (e) => {
+      const data = JSON.parse((e as MessageEvent).data) as { name: string };
+      setPhase(PHASE_LABEL[data.name] ?? data.name);
+    });
+
+    source.addEventListener('node_started', (e) => {
+      const data = JSON.parse((e as MessageEvent).data) as {
+        id: string;
+        title?: string;
+      };
+      append(`⟳ ${data.title ?? data.id}`);
+    });
+
     source.addEventListener('node_done', (e) => {
-      const d = JSON.parse((e as MessageEvent).data);
+      const data = JSON.parse((e as MessageEvent).data) as { id: string };
       setDone((n) => n + 1);
-      append(`✓ ${d.id}`, 'done');
+      append(`✓ ${data.id}`, 'done');
     });
+
     source.addEventListener('node_failed', (e) => {
-      const d = JSON.parse((e as MessageEvent).data);
-      append(`✗ ${d.id}: ${d.reason}`, 'failed');
+      const data = JSON.parse((e as MessageEvent).data) as {
+        id: string;
+        reason: string;
+      };
+      append(`✗ ${data.id}: ${data.reason}`, 'failed');
     });
+
+    source.addEventListener('node_writing', (e) => {
+      const data = JSON.parse((e as MessageEvent).data) as {
+        id: string;
+        title?: string;
+      };
+      append(`→ escrevendo ${data.title ?? data.id}`, 'writing');
+    });
+
+    source.addEventListener('attachment_downloaded', () => {
+      // discreet — could be a count later
+    });
+
     source.addEventListener('extraction_done', (e) => {
-      const d = JSON.parse((e as MessageEvent).data);
-      setStatus(`Concluído: ${d.pages} páginas, ${d.items} itens, ${d.attachments} anexos.`);
+      const data = JSON.parse((e as MessageEvent).data) as {
+        pages: number;
+        items: number;
+        attachments: number;
+      };
+      setPhase(
+        `Concluído: ${data.pages} páginas, ${data.items} itens, ${data.attachments} anexos.`,
+      );
       source.close();
     });
 
@@ -50,8 +98,12 @@ export function ProgressView({ jobId }: Props) {
 
   return (
     <section>
-      <h2>{status}</h2>
+      <h2>{phase}</h2>
+      {summary && <p>{summary}</p>}
       <progress value={done} max={Math.max(total, 1)} />
+      <p>
+        {done}/{Math.max(total, 1)} nós
+      </p>
       <pre className="log" ref={logRef}>
         {log.map((entry, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: log entries are append-only

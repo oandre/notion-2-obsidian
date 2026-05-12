@@ -1,15 +1,15 @@
 import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { NodeKind, PlannedNode } from '@shared/types';
+import type { PlannedNode } from '@shared/types';
 import { stringify as yamlStringify } from 'yaml';
 import { blocksToMd } from '../convert/blocks.js';
 import { propertiesToFrontmatter } from '../convert/properties.js';
-import type { NotionClient } from '../notion/client.js';
-import { discoverSubtree } from '../notion/discovery.js';
 import type { EventBus } from '../progress.js';
 import { AttachmentDownloader } from './attachments.js';
+import { countByKind } from './counts.js';
 import { planPaths } from './plan.js';
 import { type BrokenLink, type LinkContext, renderReport, resolvePlaceholders } from './resolve.js';
+import { expandSelectionToDescendants } from './selection.js';
 
 const ASSET_PLACEHOLDER = /\{\{notion-asset:([^}]+)\}\}/g;
 
@@ -25,14 +25,14 @@ export interface ExtractionResult {
 }
 
 export interface RunExtractionOpts {
-  client: NotionClient;
   bus: EventBus;
   outputDir: string;
-  rootSelection: Array<{ id: string; kind: NodeKind }>;
+  tree: PlannedNode[];
+  selectedIds: string[];
 }
 
 export async function runExtraction(opts: RunExtractionOpts): Promise<ExtractionResult> {
-  const { client, bus, outputDir, rootSelection } = opts;
+  const { bus, outputDir, tree, selectedIds } = opts;
   const startedAt = Date.now();
   await mkdir(outputDir, { recursive: true });
   const downloader = new AttachmentDownloader(join(outputDir, 'assets'));
@@ -48,27 +48,31 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
   };
 
   try {
-    await bus.publish({ kind: 'discovery_started', data: {} });
+    await bus.publish({ kind: 'extraction_started', data: {} });
 
-    const allNodes: PlannedNode[] = [];
-    for (const { id, kind } of rootSelection) {
-      const subtree = await discoverSubtree(client, id, kind);
-      allNodes.push(...subtree);
-      await bus.publish({
-        kind: 'discovery_progress',
-        data: { root_id: id, discovered: subtree.length },
-      });
-    }
-    await bus.publish({ kind: 'discovery_done', data: { total: allNodes.length } });
+    const effective = expandSelectionToDescendants(new Set(selectedIds), tree);
+    const idToNode = new Map(tree.map((n) => [n.id, n]));
+    const paths = planPaths(tree, outputDir);
 
-    const paths = planPaths(allNodes, outputDir);
-    const idToNode = new Map(allNodes.map((n) => [n.id, n]));
+    const counts = countByKind(effective, tree);
+    await bus.publish({
+      kind: 'extraction_planned',
+      data: {
+        totalPages: counts.totalPages,
+        totalDatabases: counts.totalDatabases,
+        totalDbItems: counts.totalDbItems,
+        totalNodes: counts.totalNodes,
+      },
+    });
+
+    await bus.publish({ kind: 'phase_started', data: { name: 'render' } });
+
     const rendered = new Map<string, string>();
-
-    for (const node of allNodes) {
+    for (const node of tree) {
+      if (!effective.has(node.id)) continue;
       await bus.publish({
         kind: 'node_started',
-        data: { id: node.id, title: node.title },
+        data: { id: node.id, title: node.title, kind: node.kind },
       });
       try {
         rendered.set(node.id, await renderNode(node, idToNode));
@@ -85,7 +89,9 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
       }
     }
 
-    for (const node of allNodes) {
+    await bus.publish({ kind: 'phase_started', data: { name: 'download_and_write' } });
+
+    for (const node of tree) {
       const md = rendered.get(node.id);
       if (md === undefined) continue;
       const urlToLocal = await downloadAssets(md, downloader, bus);
@@ -94,7 +100,7 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
         try {
           result.totalBytes += (await stat(local)).size;
         } catch {
-          // ignore stat failures
+          // stat errors are non-fatal
         }
       }
       const fromFile = paths.get(node.id);
@@ -108,6 +114,10 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
       const { md: resolved, broken } = resolvePlaceholders(md, ctx);
       result.brokenLinks.push(...broken);
       await mkdir(dirname(fromFile), { recursive: true });
+      await bus.publish({
+        kind: 'node_writing',
+        data: { id: node.id, title: node.title },
+      });
       await writeFile(fromFile, resolved, 'utf8');
     }
 
@@ -139,9 +149,7 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
 }
 
 async function renderNode(node: PlannedNode, idToNode: Map<string, PlannedNode>): Promise<string> {
-  if (node.kind === 'page') {
-    return blocksToMd(node.blocks);
-  }
+  if (node.kind === 'page') return blocksToMd(node.blocks);
   if (node.kind === 'db_item') {
     const page = node.pageData as Record<string, unknown> & {
       properties?: Record<string, unknown>;
@@ -159,9 +167,7 @@ async function renderNode(node: PlannedNode, idToNode: Map<string, PlannedNode>)
     const body = blocksToMd(node.blocks);
     return `---\n${yamlStringify(fm).trimEnd()}\n---\n\n${body}`;
   }
-  if (node.kind === 'database') {
-    return renderDatabaseIndex(node, idToNode);
-  }
+  if (node.kind === 'database') return renderDatabaseIndex(node, idToNode);
   return '';
 }
 
@@ -177,7 +183,7 @@ function renderDatabaseIndex(node: PlannedNode, idToNode: Map<string, PlannedNod
 
 async function downloadAssets(
   md: string,
-  downloader: AttachmentDownloader,
+  dl: AttachmentDownloader,
   bus: EventBus,
 ): Promise<Map<string, string>> {
   const urls = new Set<string>();
@@ -187,14 +193,14 @@ async function downloadAssets(
   const urlToLocal = new Map<string, string>();
   for (const url of urls) {
     try {
-      const local = await downloader.download(url);
+      const local = await dl.download(url);
       urlToLocal.set(url, local);
       await bus.publish({
         kind: 'attachment_downloaded',
         data: { url, path: local },
       });
     } catch {
-      // swallow per-asset failures; warnings could be added later
+      // swallow per-asset failures
     }
   }
   return urlToLocal;

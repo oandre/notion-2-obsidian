@@ -30,11 +30,20 @@ export interface ExtractRequest {
 
 export type ProgressEventKind =
   | 'discovery_started'
+  | 'roots_listing'
+  | 'roots_listed'
+  | 'root_started'
   | 'discovery_progress'
+  | 'root_done'
   | 'discovery_done'
+  | 'tree_ready'
+  | 'extraction_started'
+  | 'extraction_planned'
+  | 'phase_started'
   | 'node_started'
   | 'node_done'
   | 'node_failed'
+  | 'node_writing'
   | 'attachment_downloaded'
   | 'extraction_done'
   | 'error';
