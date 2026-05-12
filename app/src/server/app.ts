@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
-import type { PlannedNode } from '@shared/types';
+import type { LightNode, PlannedNode } from '@shared/types';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { type CachedTree, invalidateCache, loadCache, saveCache } from './cache.js';
 import { loadSettings, writeSettings } from './config.js';
@@ -23,6 +23,10 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
   const fastify = Fastify({ logger: false });
   const jobs = new Map<string, EventBus>();
   let latestTree: PlannedNode[] | null = null;
+  // Incremented every time /api/tree starts a new background discovery.
+  // Each job captures its generation at start and refuses to commit
+  // results if a newer discovery superseded it.
+  let discoveryGen = 0;
 
   const staticDir = resolveStaticDir();
   if (staticDir) {
@@ -78,8 +82,9 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
       const cached = await loadCache(outputDir);
       if (cached) {
         latestTree = cached.nodes;
+        // Strip blocks/pageData on the wire — the frontend doesn't use them.
         return {
-          nodes: cached.nodes,
+          nodes: toLightNodes(cached.nodes),
           discoveredAt: cached.discoveredAt,
           cached: true,
         };
@@ -94,11 +99,25 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
     const jobId = randomUUID();
     jobs.set(jobId, bus);
 
+    // Reset latestTree to an empty array so we can append as each root
+    // completes. Stale data from a prior discovery is discarded here.
+    latestTree = [];
+    const myGen = ++discoveryGen;
+
     void (async () => {
       await bus.publish({ kind: 'discovery_started', data: {} });
       try {
         const client = new NotionClient({ token });
-        const nodes = await discoverWorkspace(client, bus);
+        const nodes = await discoverWorkspace(client, bus, (subtree) => {
+          // Only append if this is still the active discovery.
+          if (myGen === discoveryGen) {
+            latestTree = [...(latestTree ?? []), ...subtree];
+          }
+        });
+
+        // Newer discovery superseded us — drop everything silently.
+        if (myGen !== discoveryGen) return;
+
         const workspaceId = pickWorkspaceId(nodes);
         const discoveredAt = new Date().toISOString();
         const tree: CachedTree = {
@@ -115,9 +134,10 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
         latestTree = nodes;
         await bus.publish({
           kind: 'tree_ready',
-          data: { nodes, discoveredAt },
+          data: { discoveredAt },
         });
       } catch (err) {
+        if (myGen !== discoveryGen) return;
         await bus.publish({
           kind: 'error',
           data: { message: err instanceof Error ? err.message : String(err) },
@@ -133,7 +153,7 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
     if (!settings.notionToken || !settings.outputDir) {
       return reply.code(412).send({ error: 'not configured' });
     }
-    if (!latestTree) {
+    if (latestTree === null) {
       return reply.code(412).send({ error: 'call /api/tree first' });
     }
     const { selectedIds } = req.body;
@@ -174,6 +194,16 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
   });
 
   return fastify;
+}
+
+function toLightNodes(nodes: PlannedNode[]): LightNode[] {
+  return nodes.map((n) => ({
+    id: n.id,
+    kind: n.kind,
+    title: n.title,
+    parentId: n.parentId,
+    childrenIds: n.childrenIds,
+  }));
 }
 
 function pickWorkspaceId(nodes: PlannedNode[]): string | null {

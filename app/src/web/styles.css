@@ -181,6 +181,32 @@ pre.log {
   border-top: 1px solid #eee;
   margin-top: 0.3rem;
 }
+.discovery-status {
+  background: #f5f7ff;
+  border: 1px solid #dbe2ff;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.discovery-status .current {
+  color: #555;
+  margin: 0 0 0.4rem;
+}
+.discovery-status .meta {
+  color: #777;
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0;
+}
+.tree-node.pending .row {
+  color: #999;
+  font-style: italic;
+}
+.tree-node.pending.active .row {
+  color: #2f6feb;
+}
+.tree-node.pending.failed .row {
+  color: #b04545;
+}
 .discovery-progress .meta {
   font-size: 0.85rem;
   color: #777;

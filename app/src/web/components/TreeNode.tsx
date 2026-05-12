@@ -1,11 +1,11 @@
-import type { PlannedNode } from '@shared/types';
+import type { LightNode } from '@shared/types';
 import { useMemo } from 'react';
 
 const ICON: Record<string, string> = { page: '📄', database: '🗃️', db_item: '·' };
 
 interface Props {
-  node: PlannedNode;
-  childrenOf: Map<string, PlannedNode[]>;
+  node: LightNode;
+  childrenOf: Map<string, LightNode[]>;
   selected: Set<string>;
   expanded: Set<string>;
   onToggleSelect: (id: string) => void;
@@ -83,8 +83,8 @@ export function TreeNode({
 }
 
 function anyDescendantSelected(
-  node: PlannedNode,
-  childrenOf: Map<string, PlannedNode[]>,
+  node: LightNode,
+  childrenOf: Map<string, LightNode[]>,
   selected: Set<string>,
 ): boolean {
   const children = childrenOf.get(node.id) ?? [];

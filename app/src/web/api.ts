@@ -1,4 +1,4 @@
-import type { PlannedNode } from '@shared/types';
+import type { LightNode } from '@shared/types';
 
 export async function getStatus(): Promise<{ tokenConfigured: boolean; outputDir: string | null }> {
   const res = await fetch('/api/status');
@@ -16,7 +16,7 @@ export async function postSetup(notionToken: string, outputDir: string): Promise
 }
 
 export type TreeResponse =
-  | { cached: true; nodes: PlannedNode[]; discoveredAt: string }
+  | { cached: true; nodes: LightNode[]; discoveredAt: string }
   | { cached: false; job_id: string };
 
 export async function getTree(): Promise<TreeResponse> {

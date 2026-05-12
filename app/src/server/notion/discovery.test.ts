@@ -213,7 +213,7 @@ describe('discoverWorkspace', () => {
 });
 
 describe('discoverWorkspace with bus', () => {
-  it('emits roots_listing, roots_listed, root_started, root_done events', async () => {
+  it('emits roots_listing, roots_listed, root_started, root_completed events with light subtree, and calls onRootCompleted with full nodes', async () => {
     const pool = mock.get('https://api.notion.com');
 
     pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
@@ -249,7 +249,10 @@ describe('discoverWorkspace with bus', () => {
     await new Promise((r) => setTimeout(r, 0));
 
     const client = new NotionClient({ token: 't' });
-    const nodes = await discoverWorkspace(client, bus);
+    const callbackCalls: Array<Array<{ id: string; hasBlocks: boolean }>> = [];
+    const nodes = await discoverWorkspace(client, bus, (subtree) => {
+      callbackCalls.push(subtree.map((n) => ({ id: n.id, hasBlocks: Array.isArray(n.blocks) })));
+    });
     await consumer;
 
     expect(nodes.map((n) => n.id)).toEqual(['p1']);
@@ -257,7 +260,7 @@ describe('discoverWorkspace with bus', () => {
     expect(kinds).toContain('roots_listing');
     expect(kinds).toContain('roots_listed');
     expect(kinds).toContain('root_started');
-    expect(kinds).toContain('root_done');
+    expect(kinds).toContain('root_completed');
     expect(kinds).toContain('discovery_done');
 
     const rootsListed = collected.find((e) => e.kind === 'roots_listed');
@@ -266,13 +269,29 @@ describe('discoverWorkspace with bus', () => {
     const rootStarted = collected.find((e) => e.kind === 'root_started');
     expect(rootStarted?.data).toEqual({ id: 'p1', title: 'Notas', kind: 'page' });
 
-    const rootDone = collected.find((e) => e.kind === 'root_done');
-    expect(rootDone?.data).toEqual({
+    const rootCompleted = collected.find((e) => e.kind === 'root_completed');
+    expect(rootCompleted?.data).toMatchObject({
       id: 'p1',
       title: 'Notas',
       pages: 1,
       databases: 0,
       dbItems: 0,
     });
+    // Subtree is the LIGHT form — has structural fields, no blocks/pageData
+    const subtree = (rootCompleted?.data as { subtree: unknown[] }).subtree;
+    expect(Array.isArray(subtree)).toBe(true);
+    expect(subtree.length).toBeGreaterThan(0);
+    const firstLight = subtree[0] as Record<string, unknown>;
+    expect(firstLight).toHaveProperty('id');
+    expect(firstLight).toHaveProperty('kind');
+    expect(firstLight).toHaveProperty('title');
+    expect(firstLight).toHaveProperty('parentId');
+    expect(firstLight).toHaveProperty('childrenIds');
+    expect(firstLight).not.toHaveProperty('blocks');
+    expect(firstLight).not.toHaveProperty('pageData');
+
+    // The onRootCompleted callback received FULL PlannedNodes (with blocks/pageData fields present)
+    expect(callbackCalls).toHaveLength(1);
+    expect(callbackCalls[0]?.[0]?.hasBlocks).toBe(true);
   });
 });

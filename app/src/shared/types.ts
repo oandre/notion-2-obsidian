@@ -10,6 +10,17 @@ export interface PlannedNode {
   pageData: Record<string, unknown>;
 }
 
+// Structural-only subset of PlannedNode, sent over the wire to the
+// frontend. Frontend never needs `blocks` or `pageData`; those stay
+// server-side for extraction and the on-disk cache.
+export interface LightNode {
+  id: string;
+  kind: NodeKind;
+  title: string;
+  parentId: string | null;
+  childrenIds: string[];
+}
+
 export interface NotionBlock {
   id?: string;
   type: string;
@@ -34,7 +45,7 @@ export type ProgressEventKind =
   | 'roots_listed'
   | 'root_started'
   | 'discovery_progress'
-  | 'root_done'
+  | 'root_completed'
   | 'root_failed'
   | 'discovery_done'
   | 'tree_ready'

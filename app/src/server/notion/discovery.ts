@@ -1,4 +1,4 @@
-import type { NodeKind, PlannedNode } from '@shared/types';
+import type { LightNode, NodeKind, PlannedNode } from '@shared/types';
 import { richTextToMd } from '../convert/inline.js';
 import type { EventBus } from '../progress.js';
 import type { NotionClient } from './client.js';
@@ -75,6 +75,7 @@ export async function discoverSubtree(
 export async function discoverWorkspace(
   client: NotionClient,
   bus?: EventBus,
+  onRootCompleted?: (subtree: PlannedNode[]) => Promise<void> | void,
 ): Promise<PlannedNode[]> {
   if (bus) await bus.publish({ kind: 'roots_listing', data: {} });
   const roots = await listSharedRoots(client);
@@ -95,6 +96,7 @@ export async function discoverWorkspace(
       try {
         const subtree = await discoverSubtree(client, root.id, root.kind, bus);
         out.push(...subtree);
+        if (onRootCompleted) await onRootCompleted(subtree);
         if (bus) {
           let pages = 0;
           let databases = 0;
@@ -104,9 +106,23 @@ export async function discoverWorkspace(
             else if (n.kind === 'database') databases++;
             else if (n.kind === 'db_item') dbItems++;
           }
+          const lightSubtree: LightNode[] = subtree.map((n) => ({
+            id: n.id,
+            kind: n.kind,
+            title: n.title,
+            parentId: n.parentId,
+            childrenIds: n.childrenIds,
+          }));
           await bus.publish({
-            kind: 'root_done',
-            data: { id: root.id, title: root.title, pages, databases, dbItems },
+            kind: 'root_completed',
+            data: {
+              id: root.id,
+              title: root.title,
+              pages,
+              databases,
+              dbItems,
+              subtree: lightSubtree,
+            },
           });
         }
       } catch (err) {
