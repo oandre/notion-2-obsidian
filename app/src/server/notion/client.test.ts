@@ -46,4 +46,28 @@ describe('NotionClient', () => {
     const client = new NotionClient({ token: 't', maxRetries: 3, backoffBaseMs: 0 });
     await expect(client.get('/x')).rejects.toThrow(/503/);
   });
+
+  it('retries on transient network errors (e.g. headers timeout)', async () => {
+    const pool = mock.get('https://api.notion.com');
+    // First attempt: simulate a headers-timeout-like throw from undici.
+    const timeoutError = Object.assign(new Error('Headers Timeout Error'), {
+      code: 'UND_ERR_HEADERS_TIMEOUT',
+    });
+    pool.intercept({ path: '/v1/x', method: 'GET' }).replyWithError(timeoutError);
+    // Second attempt: success.
+    pool.intercept({ path: '/v1/x', method: 'GET' }).reply(200, { ok: true });
+
+    const client = new NotionClient({ token: 't', maxRetries: 3, backoffBaseMs: 0 });
+    const result = await client.get('/x');
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('does NOT retry on non-transient errors', async () => {
+    const pool = mock.get('https://api.notion.com');
+    const fatal = Object.assign(new Error('Something else'), { code: 'EFOO' });
+    pool.intercept({ path: '/v1/x', method: 'GET' }).replyWithError(fatal);
+
+    const client = new NotionClient({ token: 't', maxRetries: 3, backoffBaseMs: 0 });
+    await expect(client.get('/x')).rejects.toThrow(/Something else/);
+  });
 });
