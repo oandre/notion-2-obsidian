@@ -35,6 +35,7 @@ export type ProgressEventKind =
   | 'root_started'
   | 'discovery_progress'
   | 'root_done'
+  | 'root_failed'
   | 'discovery_done'
   | 'tree_ready'
   | 'extraction_started'

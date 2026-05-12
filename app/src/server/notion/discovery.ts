@@ -70,21 +70,34 @@ export async function discoverWorkspace(
         data: { id: root.id, title: root.title, kind: root.kind },
       });
     }
-    const subtree = await discoverSubtree(client, root.id, root.kind, bus);
-    out.push(...subtree);
-    if (bus) {
-      let pages = 0;
-      let databases = 0;
-      let dbItems = 0;
-      for (const n of subtree) {
-        if (n.kind === 'page') pages++;
-        else if (n.kind === 'database') databases++;
-        else if (n.kind === 'db_item') dbItems++;
+    try {
+      const subtree = await discoverSubtree(client, root.id, root.kind, bus);
+      out.push(...subtree);
+      if (bus) {
+        let pages = 0;
+        let databases = 0;
+        let dbItems = 0;
+        for (const n of subtree) {
+          if (n.kind === 'page') pages++;
+          else if (n.kind === 'database') databases++;
+          else if (n.kind === 'db_item') dbItems++;
+        }
+        await bus.publish({
+          kind: 'root_done',
+          data: { id: root.id, title: root.title, pages, databases, dbItems },
+        });
       }
-      await bus.publish({
-        kind: 'root_done',
-        data: { id: root.id, title: root.title, pages, databases, dbItems },
-      });
+    } catch (err) {
+      // Skip this root, continue with the next. Common cause: a shared
+      // database the integration can't query (e.g., 400 "does not contain
+      // any data sources accessible by this API bot").
+      const reason = err instanceof Error ? err.message : String(err);
+      if (bus) {
+        await bus.publish({
+          kind: 'root_failed',
+          data: { id: root.id, title: root.title, reason },
+        });
+      }
     }
   }
 
@@ -147,7 +160,13 @@ async function walkPage(
           data: { discovered: out.length, currentRoot: ctx.rootId, title: child.title },
         });
       }
-      await walkDatabase(client, child, out, ctx);
+      try {
+        await walkDatabase(client, child, out, ctx);
+      } catch {
+        // Inaccessible database (e.g., new data-sources model). Keep the
+        // database node in the tree but skip its rows — better than
+        // aborting the whole root walk.
+      }
     }
   }
 }

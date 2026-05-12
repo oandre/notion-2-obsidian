@@ -5,10 +5,11 @@ interface RootSummary {
   id: string;
   title: string;
   kind: string;
-  status: 'pending' | 'active' | 'done';
+  status: 'pending' | 'active' | 'done' | 'failed';
   pages: number;
   databases: number;
   dbItems: number;
+  failureReason?: string;
 }
 
 interface Props {
@@ -18,6 +19,8 @@ interface Props {
 
 export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
   const [discovered, setDiscovered] = useState(0);
+  const [totalRoots, setTotalRoots] = useState(0);
+  const [rootsCompleted, setRootsCompleted] = useState(0);
   const [currentText, setCurrentText] = useState('');
   const [roots, setRoots] = useState<RootSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,7 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
 
     source.addEventListener('roots_listed', (e) => {
       const data = JSON.parse((e as MessageEvent).data) as { count: number };
+      setTotalRoots(data.count);
       setCurrentText(`Encontradas ${data.count} raízes`);
     });
 
@@ -84,6 +88,21 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
             : r,
         ),
       );
+      setRootsCompleted((n) => n + 1);
+    });
+
+    source.addEventListener('root_failed', (e) => {
+      const data = JSON.parse((e as MessageEvent).data) as {
+        id: string;
+        title: string;
+        reason: string;
+      };
+      setRoots((prev) =>
+        prev.map((r) =>
+          r.id === data.id ? { ...r, status: 'failed', failureReason: data.reason } : r,
+        ),
+      );
+      setRootsCompleted((n) => n + 1);
     });
 
     source.addEventListener('tree_ready', (e) => {
@@ -107,14 +126,30 @@ export function DiscoveryProgress({ jobId, onTreeReady }: Props) {
     return () => source.close();
   }, [jobId]);
 
+  const barProps =
+    totalRoots > 0 ? { value: rootsCompleted, max: totalRoots } : ({} as Record<string, never>);
+
   return (
     <div className="discovery-progress">
       <h2>Mapeando o workspace…</h2>
       <p className="counter">{discovered} nós encontrados</p>
       <p className="current">{currentText}</p>
-      <progress />
+      <progress {...barProps} />
+      {totalRoots > 0 && (
+        <p className="meta">
+          {rootsCompleted}/{totalRoots} raízes
+        </p>
+      )}
       <ul className="roots-list">
         {roots.map((r) => {
+          if (r.status === 'failed') {
+            return (
+              <li key={r.id} className="failed">
+                ✗ {r.title} — pulada
+                {r.failureReason ? `: ${r.failureReason}` : ''}
+              </li>
+            );
+          }
           const summary =
             r.status === 'done'
               ? ` (${r.pages} pages${r.databases ? `, ${r.databases} db` : ''}${r.dbItems ? `, ${r.dbItems} items` : ''})`

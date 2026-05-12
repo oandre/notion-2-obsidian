@@ -171,6 +171,18 @@ pre.log {
 .discovery-progress .roots-list .active {
   color: #2f6feb;
 }
+.discovery-progress .roots-list .failed {
+  color: #b04545;
+}
+.discovery-progress .meta {
+  font-size: 0.85rem;
+  color: #777;
+  margin: 0.25rem 0 0.5rem;
+}
+.discovery-progress progress {
+  width: 100%;
+  height: 0.6rem;
+}
 .discovery-progress .err {
   color: crimson;
   margin-top: 0.5rem;
