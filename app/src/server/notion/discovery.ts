@@ -81,43 +81,48 @@ export async function discoverWorkspace(
   if (bus) await bus.publish({ kind: 'roots_listed', data: { count: roots.length } });
 
   const out: PlannedNode[] = [];
-  for (const root of roots) {
-    if (bus) {
-      await bus.publish({
-        kind: 'root_started',
-        data: { id: root.id, title: root.title, kind: root.kind },
-      });
-    }
-    try {
-      const subtree = await discoverSubtree(client, root.id, root.kind, bus);
-      out.push(...subtree);
+  // Roots walk in parallel. NotionClient's p-limit(3) still throttles
+  // the actual HTTP calls so we don't exceed Notion's rate limit; this
+  // just keeps the semaphore saturated instead of one-root-at-a-time.
+  await Promise.all(
+    roots.map(async (root) => {
       if (bus) {
-        let pages = 0;
-        let databases = 0;
-        let dbItems = 0;
-        for (const n of subtree) {
-          if (n.kind === 'page') pages++;
-          else if (n.kind === 'database') databases++;
-          else if (n.kind === 'db_item') dbItems++;
+        await bus.publish({
+          kind: 'root_started',
+          data: { id: root.id, title: root.title, kind: root.kind },
+        });
+      }
+      try {
+        const subtree = await discoverSubtree(client, root.id, root.kind, bus);
+        out.push(...subtree);
+        if (bus) {
+          let pages = 0;
+          let databases = 0;
+          let dbItems = 0;
+          for (const n of subtree) {
+            if (n.kind === 'page') pages++;
+            else if (n.kind === 'database') databases++;
+            else if (n.kind === 'db_item') dbItems++;
+          }
+          await bus.publish({
+            kind: 'root_done',
+            data: { id: root.id, title: root.title, pages, databases, dbItems },
+          });
         }
-        await bus.publish({
-          kind: 'root_done',
-          data: { id: root.id, title: root.title, pages, databases, dbItems },
-        });
+      } catch (err) {
+        // Skip this root, continue with others. Common cause: a shared
+        // database the integration can't query (400 "does not contain
+        // any data sources accessible by this API bot").
+        const reason = err instanceof Error ? err.message : String(err);
+        if (bus) {
+          await bus.publish({
+            kind: 'root_failed',
+            data: { id: root.id, title: root.title, reason },
+          });
+        }
       }
-    } catch (err) {
-      // Skip this root, continue with the next. Common cause: a shared
-      // database the integration can't query (e.g., 400 "does not contain
-      // any data sources accessible by this API bot").
-      const reason = err instanceof Error ? err.message : String(err);
-      if (bus) {
-        await bus.publish({
-          kind: 'root_failed',
-          data: { id: root.id, title: root.title, reason },
-        });
-      }
-    }
-  }
+    }),
+  );
 
   if (bus) {
     let pages = 0;
@@ -146,6 +151,10 @@ async function walkPage(
   const blocks: Block[] = await fetchBlockChildren(client, node.id);
   // biome-ignore lint/suspicious/noExplicitAny: casting to shared NotionBlock shape
   node.blocks = blocks as any;
+
+  // First pass (synchronous): create child nodes and append them to the
+  // parent + the flat output. Preserves the order of node.childrenIds.
+  const walks: Array<Promise<void>> = [];
   for (const block of blocks) {
     if (block.type === 'child_page') {
       const child = makeNode(
@@ -156,13 +165,7 @@ async function walkPage(
       );
       node.childrenIds.push(child.id);
       out.push(child);
-      if (ctx.bus) {
-        await ctx.bus.publish({
-          kind: 'discovery_progress',
-          data: { discovered: out.length, currentRoot: ctx.rootId, title: child.title },
-        });
-      }
-      await walkPage(client, child, out, ctx);
+      walks.push(runChildWalk(child, () => walkPage(client, child, out, ctx), ctx, out));
     } else if (block.type === 'child_database') {
       const child = makeNode(
         block.id as string,
@@ -172,21 +175,37 @@ async function walkPage(
       );
       node.childrenIds.push(child.id);
       out.push(child);
-      if (ctx.bus) {
-        await ctx.bus.publish({
-          kind: 'discovery_progress',
-          data: { discovered: out.length, currentRoot: ctx.rootId, title: child.title },
-        });
-      }
-      try {
-        await walkDatabase(client, child, out, ctx);
-      } catch {
-        // Inaccessible database (e.g., new data-sources model). Keep the
-        // database node in the tree but skip its rows — better than
-        // aborting the whole root walk.
-      }
+      walks.push(
+        runChildWalk(
+          child,
+          // Inaccessible databases (e.g., new data-sources model) keep
+          // the database node but skip their rows — don't fail the parent.
+          () => walkDatabase(client, child, out, ctx).catch(() => undefined),
+          ctx,
+          out,
+        ),
+      );
     }
   }
+
+  // Second pass (parallel): NotionClient's p-limit(3) keeps the actual
+  // HTTP throughput in check; we just keep its queue saturated.
+  await Promise.all(walks);
+}
+
+async function runChildWalk(
+  child: PlannedNode,
+  walk: () => Promise<void>,
+  ctx: { bus: EventBus | undefined; rootId: string },
+  out: PlannedNode[],
+): Promise<void> {
+  if (ctx.bus) {
+    await ctx.bus.publish({
+      kind: 'discovery_progress',
+      data: { discovered: out.length, currentRoot: ctx.rootId, title: child.title },
+    });
+  }
+  await walk();
 }
 
 async function walkDatabase(
@@ -196,18 +215,14 @@ async function walkDatabase(
   ctx: { bus: EventBus | undefined; rootId: string },
 ): Promise<void> {
   const items = await queryDatabase(client, node.id);
+  const walks: Array<Promise<void>> = [];
   for (const item of items) {
     const itemNode = makeNode(item.id as string, 'db_item', pageTitle(item), node.id, item);
     node.childrenIds.push(itemNode.id);
     out.push(itemNode);
-    if (ctx.bus) {
-      await ctx.bus.publish({
-        kind: 'discovery_progress',
-        data: { discovered: out.length, currentRoot: ctx.rootId, title: itemNode.title },
-      });
-    }
-    await walkPage(client, itemNode, out, ctx);
+    walks.push(runChildWalk(itemNode, () => walkPage(client, itemNode, out, ctx), ctx, out));
   }
+  await Promise.all(walks);
 }
 
 function makeNode(
