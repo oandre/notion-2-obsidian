@@ -68,7 +68,6 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
     const refresh = req.query.refresh === 'true';
     const client = new NotionClient({ token: settings.notionToken });
 
-    // workspaceId for cache validity, derived from the set of root ids
     const roots = await listSharedRoots(client);
     const workspaceId = pickWorkspaceId(roots);
 
@@ -86,21 +85,42 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
       await invalidateCache(settings.outputDir);
     }
 
-    const nodes = await discoverWorkspace(client);
-    const discoveredAt = new Date().toISOString();
-    const tree: CachedTree = {
-      version: 1,
-      workspaceId,
-      discoveredAt,
-      nodes,
-    };
-    try {
-      await saveCache(settings.outputDir, tree);
-    } catch {
-      // permission errors are non-fatal — we still have the tree in memory
-    }
-    latestTree = nodes;
-    return { nodes, discoveredAt, cached: false };
+    // Cache miss → background discovery + SSE job
+    const bus = new EventBus();
+    const jobId = randomUUID();
+    jobs.set(jobId, bus);
+
+    const outputDir = settings.outputDir;
+    void (async () => {
+      await bus.publish({ kind: 'discovery_started', data: {} });
+      try {
+        const nodes = await discoverWorkspace(client, bus);
+        const discoveredAt = new Date().toISOString();
+        const tree: CachedTree = {
+          version: 1,
+          workspaceId,
+          discoveredAt,
+          nodes,
+        };
+        try {
+          await saveCache(outputDir, tree);
+        } catch {
+          // non-fatal
+        }
+        latestTree = nodes;
+        await bus.publish({
+          kind: 'tree_ready',
+          data: { nodes, discoveredAt },
+        });
+      } catch (err) {
+        await bus.publish({
+          kind: 'error',
+          data: { message: err instanceof Error ? err.message : String(err) },
+        });
+      }
+    })();
+
+    return { job_id: jobId, cached: false };
   });
 
   fastify.post<{ Body: { selectedIds: string[] } }>('/api/extract', async (req, reply) => {
@@ -141,7 +161,8 @@ export async function buildApp(opts: BuildAppOpts): Promise<FastifyInstance> {
     reply.hijack();
     for await (const event of bus.subscribe()) {
       reply.raw.write(eventToSse(event));
-      if (event.kind === 'extraction_done' || event.kind === 'error') break;
+      if (event.kind === 'extraction_done' || event.kind === 'tree_ready' || event.kind === 'error')
+        break;
     }
     reply.raw.end();
     return reply;

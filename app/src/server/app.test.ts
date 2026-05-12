@@ -78,20 +78,17 @@ describe('Fastify app — v0.3', () => {
     await app.close();
   });
 
-  it('GET /api/tree fetches and caches on first call', async () => {
+  it('GET /api/tree on cache miss returns { job_id, cached: false } and tree_ready arrives via SSE', async () => {
     const { app, cwd } = await setupApp();
     const pool = mock.get('https://api.notion.com');
 
-    // /search returns p1
+    // First /v1/search call: cache-miss check (in the handler)
     pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
       results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
       next_cursor: null,
       has_more: false,
     });
-    // The /api/tree handler calls listSharedRoots (already done above)
-    // then discoverWorkspace, which itself calls listSharedRoots again,
-    // then discoverSubtree for p1 (which calls /pages/p1 + /blocks/p1/children).
-    // Mock both: a second /search response, plus the two endpoints.
+    // Second /v1/search call: inside discoverWorkspace (in the bg)
     pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
       results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
       next_cursor: null,
@@ -107,16 +104,81 @@ describe('Fastify app — v0.3', () => {
 
     const res = await app.inject({ method: 'GET', url: '/api/tree' });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as {
-      nodes: Array<{ id: string }>;
-      discoveredAt: string;
-      cached: boolean;
-    };
-    expect(body.nodes.find((n) => n.id === 'p1')).toBeDefined();
+    const body = res.json() as { job_id?: string; nodes?: unknown; cached: boolean };
     expect(body.cached).toBe(false);
+    expect(body.job_id).toMatch(/^[0-9a-f-]+$/);
+    expect(body.nodes).toBeUndefined();
+
+    // Wait for the background discovery to complete by polling /api/extract
+    // — once the bg discovery sets latestTree, /api/extract no longer 412s.
+    let extractRes: Awaited<ReturnType<typeof app.inject>> | undefined;
+    for (let i = 0; i < 50; i++) {
+      extractRes = await app.inject({
+        method: 'POST',
+        url: '/api/extract',
+        payload: { selectedIds: ['p1'] },
+      });
+      if (extractRes.statusCode !== 412) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(extractRes?.statusCode).toBe(200);
 
     const cached = await readFile(join(cwd, '.notion-2-obsidian-cache.json'), 'utf8');
     expect(JSON.parse(cached).nodes.find((n: { id: string }) => n.id === 'p1')).toBeDefined();
+    await app.close();
+  });
+
+  it('GET /api/tree on cache hit returns nodes synchronously (no job_id)', async () => {
+    const { app, cwd } = await setupApp();
+    const pool = mock.get('https://api.notion.com');
+
+    // First call: miss → discovery
+    pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
+      results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
+      next_cursor: null,
+      has_more: false,
+    });
+    pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
+      results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
+      next_cursor: null,
+      has_more: false,
+    });
+    pool.intercept({ path: '/v1/pages/p1', method: 'GET' }).reply(200, {
+      id: 'p1',
+      properties: { title: richTitle('Top') },
+    });
+    pool
+      .intercept({ path: '/v1/blocks/p1/children?page_size=100', method: 'GET' })
+      .reply(200, { results: [], next_cursor: null, has_more: false });
+
+    await app.inject({ method: 'GET', url: '/api/tree' });
+    // Wait for bg discovery to write the cache file
+    for (let i = 0; i < 50; i++) {
+      try {
+        await readFile(join(cwd, '.notion-2-obsidian-cache.json'), 'utf8');
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+    }
+
+    // Second /api/tree call: cache hit, only the workspaceId-key /v1/search needed
+    pool.intercept({ path: '/v1/search', method: 'POST' }).reply(200, {
+      results: [{ object: 'page', id: 'p1', properties: { title: richTitle('Top') } }],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/api/tree' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      job_id?: string;
+      nodes?: Array<{ id: string }>;
+      cached: boolean;
+    };
+    expect(body.cached).toBe(true);
+    expect(body.job_id).toBeUndefined();
+    expect(body.nodes?.find((n) => n.id === 'p1')).toBeDefined();
     await app.close();
   });
 
