@@ -6,6 +6,7 @@ import { blocksToMd } from '../convert/blocks.js';
 import { propertiesToFrontmatter } from '../convert/properties.js';
 import type { EventBus } from '../progress.js';
 import { AttachmentDownloader } from './attachments.js';
+import { countByKind } from './counts.js';
 import { planPaths } from './plan.js';
 import { type BrokenLink, type LinkContext, renderReport, resolvePlaceholders } from './resolve.js';
 import { expandSelectionToDescendants } from './selection.js';
@@ -47,15 +48,31 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
   };
 
   try {
+    await bus.publish({ kind: 'extraction_started', data: {} });
+
     const effective = expandSelectionToDescendants(new Set(selectedIds), tree);
     const idToNode = new Map(tree.map((n) => [n.id, n]));
     const paths = planPaths(tree, outputDir);
+
+    const counts = countByKind(effective, tree);
+    await bus.publish({
+      kind: 'extraction_planned',
+      data: {
+        totalPages: counts.totalPages,
+        totalDatabases: counts.totalDatabases,
+        totalDbItems: counts.totalDbItems,
+        totalNodes: counts.totalNodes,
+      },
+    });
+
+    await bus.publish({ kind: 'phase_started', data: { name: 'render' } });
+
     const rendered = new Map<string, string>();
     for (const node of tree) {
       if (!effective.has(node.id)) continue;
       await bus.publish({
         kind: 'node_started',
-        data: { id: node.id, title: node.title },
+        data: { id: node.id, title: node.title, kind: node.kind },
       });
       try {
         rendered.set(node.id, await renderNode(node, idToNode));
@@ -71,6 +88,8 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
         });
       }
     }
+
+    await bus.publish({ kind: 'phase_started', data: { name: 'download_and_write' } });
 
     for (const node of tree) {
       const md = rendered.get(node.id);
@@ -95,6 +114,10 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
       const { md: resolved, broken } = resolvePlaceholders(md, ctx);
       result.brokenLinks.push(...broken);
       await mkdir(dirname(fromFile), { recursive: true });
+      await bus.publish({
+        kind: 'node_writing',
+        data: { id: node.id, title: node.title },
+      });
       await writeFile(fromFile, resolved, 'utf8');
     }
 

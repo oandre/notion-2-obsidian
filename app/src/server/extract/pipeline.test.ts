@@ -150,3 +150,71 @@ describe('runExtraction (tree-driven)', () => {
     await expect(readFile(join(dir, 'Alpha.md'), 'utf8')).rejects.toThrow();
   });
 });
+
+describe('runExtraction events (v0.4 phase + planned)', () => {
+  it('emits extraction_started, extraction_planned, two phase_starteds, node_writing', async () => {
+    const dir = await tmp();
+    const tree: PlannedNode[] = [
+      makeNode({
+        id: 'p1',
+        kind: 'page',
+        title: 'Hello',
+        blocks: [paragraph('b1', 'world')],
+      }),
+      makeNode({
+        id: 'd1',
+        kind: 'database',
+        title: 'Tarefas',
+        childrenIds: ['r1'],
+      }),
+      makeNode({
+        id: 'r1',
+        kind: 'db_item',
+        title: 'Fazer X',
+        parentId: 'd1',
+        pageData: {},
+      }),
+    ];
+
+    const collected: Array<{ kind: string; data: Record<string, unknown> }> = [];
+    const bus = new EventBus();
+    const consumer = (async () => {
+      for await (const event of bus.subscribe()) {
+        collected.push({ kind: event.kind, data: event.data });
+        if (event.kind === 'extraction_done') break;
+      }
+    })();
+    await new Promise((r) => setTimeout(r, 0));
+
+    await runExtraction({
+      bus,
+      outputDir: dir,
+      tree,
+      selectedIds: ['p1', 'd1'],
+    });
+    await consumer;
+
+    const kinds = collected.map((e) => e.kind);
+    expect(kinds).toContain('extraction_started');
+    expect(kinds).toContain('extraction_planned');
+
+    const planned = collected.find((e) => e.kind === 'extraction_planned');
+    expect(planned?.data).toEqual({
+      totalPages: 1,
+      totalDatabases: 1,
+      totalDbItems: 1,
+      totalNodes: 3,
+    });
+
+    const phases = collected
+      .filter((e) => e.kind === 'phase_started')
+      .map((e) => (e.data as { name: string }).name);
+    expect(phases).toEqual(['render', 'download_and_write']);
+
+    const nodeStarted = collected.find((e) => e.kind === 'node_started');
+    expect(nodeStarted?.data).toMatchObject({ id: 'p1', title: 'Hello', kind: 'page' });
+
+    const nodeWriting = collected.find((e) => e.kind === 'node_writing');
+    expect(nodeWriting?.data).toMatchObject({ id: 'p1', title: 'Hello' });
+  });
+});
