@@ -16,15 +16,26 @@ export function TreeView({ onStart }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [discoveryJobId, setDiscoveryJobId] = useState<string | null>(null);
 
   useEffect(() => {
     getTree()
       .then((r) => {
-        setNodes(r.nodes);
-        setDiscoveredAt(r.discoveredAt);
+        if (r.cached) {
+          setNodes(r.nodes);
+          setDiscoveredAt(r.discoveredAt);
+        } else {
+          setDiscoveryJobId(r.job_id);
+        }
       })
       .catch((e) => setError(String(e)));
   }, []);
+
+  function handleTreeReady(newNodes: PlannedNode[], newDiscoveredAt: string) {
+    setNodes(newNodes);
+    setDiscoveredAt(newDiscoveredAt);
+    setDiscoveryJobId(null);
+  }
 
   const { roots, childrenOf } = useMemo(() => {
     const all = nodes ?? [];
@@ -78,10 +89,15 @@ export function TreeView({ onStart }: Props) {
   async function doRefresh() {
     setRefreshing(true);
     setError(null);
+    setNodes(null);
     try {
       const r = await refreshTree();
-      setNodes(r.nodes);
-      setDiscoveredAt(r.discoveredAt);
+      if (r.cached) {
+        setNodes(r.nodes);
+        setDiscoveredAt(r.discoveredAt);
+      } else {
+        setDiscoveryJobId(r.job_id);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -102,7 +118,12 @@ export function TreeView({ onStart }: Props) {
   }
 
   if (error) return <p style={{ color: 'crimson' }}>{error}</p>;
-  if (nodes === null) return <DiscoveryProgress />;
+  if (nodes === null) {
+    if (discoveryJobId) {
+      return <DiscoveryProgress jobId={discoveryJobId} onTreeReady={handleTreeReady} />;
+    }
+    return <p>Carregando…</p>;
+  }
   if (!nodes.length) {
     return <p>Nenhuma página/database compartilhada com a integração ainda.</p>;
   }
