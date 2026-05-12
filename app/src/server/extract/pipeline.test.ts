@@ -152,7 +152,7 @@ describe('runExtraction (tree-driven)', () => {
 });
 
 describe('runExtraction events (v0.4 phase + planned)', () => {
-  it('emits extraction_started, extraction_planned, two phase_starteds, node_writing', async () => {
+  it('emits extraction_started, extraction_planned, three phase_starteds, node_writing', async () => {
     const dir = await tmp();
     const tree: PlannedNode[] = [
       makeNode({
@@ -209,7 +209,7 @@ describe('runExtraction events (v0.4 phase + planned)', () => {
     const phases = collected
       .filter((e) => e.kind === 'phase_started')
       .map((e) => (e.data as { name: string }).name);
-    expect(phases).toEqual(['render', 'download_and_write']);
+    expect(phases).toEqual(['render', 'download', 'write']);
 
     const nodeStarted = collected.find((e) => e.kind === 'node_started');
     expect(nodeStarted?.data).toMatchObject({ id: 'p1', title: 'Hello', kind: 'page' });

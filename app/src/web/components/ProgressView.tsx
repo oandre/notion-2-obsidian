@@ -8,7 +8,8 @@ type LogEntry = { text: string; cls: 'done' | 'failed' | 'writing' | '' };
 
 const PHASE_LABEL: Record<string, string> = {
   render: 'Renderizando blocos',
-  download_and_write: 'Baixando anexos e escrevendo arquivos',
+  download: 'Baixando anexos',
+  write: 'Escrevendo arquivos',
 };
 
 export function ProgressView({ jobId }: Props) {

@@ -89,37 +89,70 @@ export async function runExtraction(opts: RunExtractionOpts): Promise<Extraction
       }
     }
 
-    await bus.publish({ kind: 'phase_started', data: { name: 'download_and_write' } });
+    // -------- Phase 2: download all attachments in parallel --------
+    // Collect every unique asset URL across all rendered nodes first, so
+    // we only download each one once even if it's referenced from many
+    // pages. AttachmentDownloader's p-limit(8) throttles real HTTP
+    // throughput; Promise.all keeps that pool saturated.
+    await bus.publish({ kind: 'phase_started', data: { name: 'download' } });
 
-    for (const node of tree) {
-      const md = rendered.get(node.id);
-      if (md === undefined) continue;
-      const urlToLocal = await downloadAssets(md, downloader, bus);
-      result.attachmentsDownloaded += urlToLocal.size;
-      for (const local of urlToLocal.values()) {
+    const allUrls = new Set<string>();
+    for (const md of rendered.values()) {
+      for (const m of md.matchAll(ASSET_PLACEHOLDER)) {
+        if (m[1]) allUrls.add(m[1]);
+      }
+    }
+    const urlToLocal = new Map<string, string>();
+    await Promise.all(
+      Array.from(allUrls).map(async (url) => {
+        try {
+          const local = await downloader.download(url);
+          urlToLocal.set(url, local);
+          await bus.publish({
+            kind: 'attachment_downloaded',
+            data: { url, path: local },
+          });
+        } catch {
+          // swallow per-asset failures — the asset URL stays in the
+          // markdown as-is via resolvePlaceholders' fallback.
+        }
+      }),
+    );
+    result.attachmentsDownloaded = urlToLocal.size;
+    await Promise.all(
+      Array.from(urlToLocal.values()).map(async (local) => {
         try {
           result.totalBytes += (await stat(local)).size;
         } catch {
           // stat errors are non-fatal
         }
-      }
-      const fromFile = paths.get(node.id);
-      if (!fromFile) continue;
-      const ctx: LinkContext = {
-        fromFile,
-        idToPath: paths,
-        urlToLocal,
-        vaultRoot: outputDir,
-      };
-      const { md: resolved, broken } = resolvePlaceholders(md, ctx);
-      result.brokenLinks.push(...broken);
-      await mkdir(dirname(fromFile), { recursive: true });
-      await bus.publish({
-        kind: 'node_writing',
-        data: { id: node.id, title: node.title },
-      });
-      await writeFile(fromFile, resolved, 'utf8');
-    }
+      }),
+    );
+
+    // -------- Phase 3: resolve placeholders + write files in parallel --------
+    await bus.publish({ kind: 'phase_started', data: { name: 'write' } });
+    await Promise.all(
+      tree.map(async (node) => {
+        const md = rendered.get(node.id);
+        if (md === undefined) return;
+        const fromFile = paths.get(node.id);
+        if (!fromFile) return;
+        const ctx: LinkContext = {
+          fromFile,
+          idToPath: paths,
+          urlToLocal,
+          vaultRoot: outputDir,
+        };
+        const { md: resolved, broken } = resolvePlaceholders(md, ctx);
+        result.brokenLinks.push(...broken);
+        await mkdir(dirname(fromFile), { recursive: true });
+        await bus.publish({
+          kind: 'node_writing',
+          data: { id: node.id, title: node.title },
+        });
+        await writeFile(fromFile, resolved, 'utf8');
+      }),
+    );
 
     result.durationS = (Date.now() - startedAt) / 1000;
     const report = renderReport({
@@ -179,29 +212,4 @@ function renderDatabaseIndex(node: PlannedNode, idToNode: Map<string, PlannedNod
     lines.push(`| {{notion-link:${row.id}|${row.title}}} |`);
   }
   return `${lines.join('\n')}\n`;
-}
-
-async function downloadAssets(
-  md: string,
-  dl: AttachmentDownloader,
-  bus: EventBus,
-): Promise<Map<string, string>> {
-  const urls = new Set<string>();
-  for (const m of md.matchAll(ASSET_PLACEHOLDER)) {
-    if (m[1]) urls.add(m[1]);
-  }
-  const urlToLocal = new Map<string, string>();
-  for (const url of urls) {
-    try {
-      const local = await dl.download(url);
-      urlToLocal.set(url, local);
-      await bus.publish({
-        kind: 'attachment_downloaded',
-        data: { url, path: local },
-      });
-    } catch {
-      // swallow per-asset failures
-    }
-  }
-  return urlToLocal;
 }
