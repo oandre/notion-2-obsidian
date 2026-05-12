@@ -136,3 +136,39 @@ pre.log {
   color: #555;
   margin: 0.5rem 0;
 }
+.discovery-progress h2 {
+  margin-top: 0;
+}
+.discovery-progress .counter {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0.25rem 0;
+}
+.discovery-progress .current {
+  color: #555;
+  margin: 0 0 1rem;
+  min-height: 1.25rem;
+}
+.discovery-progress .roots-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+.discovery-progress .roots-list li {
+  padding: 0.15rem 0;
+}
+.discovery-progress .roots-list .pending {
+  color: #999;
+}
+.discovery-progress .roots-list .done {
+  color: #2a7a2a;
+}
+.discovery-progress .roots-list .active {
+  color: #2f6feb;
+}
+.discovery-progress .err {
+  color: crimson;
+  margin-top: 0.5rem;
+}
